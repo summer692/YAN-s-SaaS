@@ -501,27 +501,21 @@ a:hover { text-decoration: underline; }
   padding-top: 6px;
 }
 
-/* Header tools (theme picker + settings) ------------------------------ */
+/* Header tools (combined menu) ---------------------------------------- */
 .header-tools {
   display: flex;
   align-items: center;
-  gap: 4px;
 }
-.theme-picker,
-.settings {
+.header-menu {
   position: relative;
 }
 .theme-swatch {
   display: inline-block;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   border: 0.5px solid var(--border);
   vertical-align: middle;
-}
-.theme-swatch[data-current] {
-  background: var(--accent);
-  border-color: var(--accent);
 }
 .theme-swatch[data-theme="white"] { background: #ffffff; border-color: #ececec; }
 .theme-swatch[data-theme="black"] { background: #0a0a0a; border-color: #262626; }
@@ -530,42 +524,63 @@ a:hover { text-decoration: underline; }
 .theme-swatch[data-theme="green"] { background: #16a34a; border-color: #16a34a; }
 .theme-swatch[data-theme="pink"]  { background: #ec4899; border-color: #ec4899; }
 
-.theme-menu,
-.settings-menu {
+.header-menu-panel {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
   background: var(--bg-page);
   border: 0.5px solid var(--border);
   border-radius: 10px;
-  padding: 6px;
-  min-width: 160px;
+  padding: 8px;
+  min-width: 200px;
   z-index: 20;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
-.theme-option,
-.settings-menu button {
+.menu-section { padding: 4px 6px 8px; }
+.menu-section-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+}
+.theme-swatches {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.theme-swatch-btn {
+  background: transparent;
+  border: none;
+  padding: 2px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.theme-swatch-btn.active {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.menu-divider {
+  height: 0.5px;
+  background: var(--border);
+  margin: 4px 0;
+}
+.menu-item {
   background: transparent;
   border: none;
   text-align: left;
-  padding: 6px 10px;
+  padding: 7px 10px;
   border-radius: 6px;
   color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 8px;
   font-size: 13px;
+  cursor: pointer;
 }
-.theme-option:hover,
-.settings-menu button:hover {
-  background: var(--bg-card);
-}
-.theme-option.active {
-  background: var(--bg-card);
-}
-.settings-menu .danger-text { color: #991b1b; }
+.menu-item:hover { background: var(--bg-card); }
+.menu-item.danger-text { color: #991b1b; }
 
 /* Header search + renewals -------------------------------------------- */
 .header-search {

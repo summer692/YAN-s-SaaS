@@ -706,15 +706,16 @@
     });
   }
 
-  // ---------- Theme ----------
-  const themeToggle = document.getElementById('theme-toggle');
-  const themeMenu = document.getElementById('theme-menu');
+  // ---------- Header menu (theme + settings combined) ----------
+  const headerMenuToggle = document.getElementById('header-menu-toggle');
+  const headerMenuPanel = document.getElementById('header-menu-panel');
+  const importFile = document.getElementById('import-file');
 
   function applyTheme(name) {
     const theme = VALID_THEMES.includes(name) ? name : 'white';
     document.body.dataset.theme = theme;
     localStorage.setItem(THEME_KEY, theme);
-    themeMenu.querySelectorAll('.theme-option').forEach((b) =>
+    headerMenuPanel.querySelectorAll('.theme-swatch-btn').forEach((b) =>
       b.classList.toggle('active', b.dataset.theme === theme)
     );
     const metaTheme = document.querySelector('meta[name="theme-color"]');
@@ -724,39 +725,27 @@
     }
   }
 
-  themeToggle.addEventListener('click', (e) => {
+  headerMenuToggle.addEventListener('click', (e) => {
     e.stopPropagation();
-    themeMenu.hidden = !themeMenu.hidden;
-    settingsMenu.hidden = true;
+    headerMenuPanel.hidden = !headerMenuPanel.hidden;
   });
-  themeMenu.addEventListener('click', (e) => {
-    const btn = e.target.closest('.theme-option');
-    if (!btn) return;
-    applyTheme(btn.dataset.theme);
-    themeMenu.hidden = true;
+
+  headerMenuPanel.addEventListener('click', (e) => {
+    const themeBtn = e.target.closest('.theme-swatch-btn');
+    if (themeBtn) {
+      applyTheme(themeBtn.dataset.theme);
+      // 主题切换不关闭面板，方便快速试色
+      return;
+    }
+    const actionBtn = e.target.closest('button[data-action]');
+    if (!actionBtn) return;
+    headerMenuPanel.hidden = true;
+    if (actionBtn.dataset.action === 'export') exportData();
+    if (actionBtn.dataset.action === 'import') importFile.click();
+    if (actionBtn.dataset.action === 'clear') clearAll();
   });
 
   applyTheme(localStorage.getItem(THEME_KEY) || 'white');
-
-  // ---------- Settings menu (export / import / clear) ----------
-  const settingsToggle = document.getElementById('settings-toggle');
-  const settingsMenu = document.getElementById('settings-menu');
-  const importFile = document.getElementById('import-file');
-
-  settingsToggle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    settingsMenu.hidden = !settingsMenu.hidden;
-    themeMenu.hidden = true;
-  });
-
-  settingsMenu.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-action]');
-    if (!btn) return;
-    settingsMenu.hidden = true;
-    if (btn.dataset.action === 'export') exportData();
-    if (btn.dataset.action === 'import') importFile.click();
-    if (btn.dataset.action === 'clear') clearAll();
-  });
 
   importFile.addEventListener('change', async () => {
     const file = importFile.files && importFile.files[0];
@@ -827,16 +816,14 @@
   }
 
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('#theme-picker')) themeMenu.hidden = true;
-    if (!e.target.closest('#settings')) settingsMenu.hidden = true;
+    if (!e.target.closest('#header-menu')) headerMenuPanel.hidden = true;
   });
 
   // ---------- Global keys ----------
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (!projectModal.hidden) closeProjectModal();
-      themeMenu.hidden = true;
-      settingsMenu.hidden = true;
+      headerMenuPanel.hidden = true;
       return;
     }
 
