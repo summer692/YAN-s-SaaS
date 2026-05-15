@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#ffffff" />
+  <title>SaaS 指挥中心</title>
+  <link rel="stylesheet" href="themes.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-theme="white">
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <h1>SaaS 指挥中心</h1>
+      </div>
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="projects" role="tab">项目</button>
+        <button class="tab" data-tab="ideas" role="tab">灵感</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <!-- 项目页 -->
+    <section class="view active" data-view="projects">
+      <div class="view-toolbar">
+        <div class="filters" id="project-filters">
+          <button class="chip active" data-filter="all">全部</button>
+          <button class="chip" data-filter="构思中">构思中</button>
+          <button class="chip" data-filter="开发中">开发中</button>
+          <button class="chip" data-filter="已上线">已上线</button>
+          <button class="chip" data-filter="暂停">暂停</button>
+          <button class="chip" data-filter="已下线">已下线</button>
+        </div>
+        <button class="btn-primary" id="btn-new-project">+ 新建项目</button>
+      </div>
+      <div class="cards" id="project-list"></div>
+      <p class="empty-hint" id="project-empty" hidden>还没有项目，点右上角「新建项目」开始记录。</p>
+    </section>
+
+    <!-- 灵感页 -->
+    <section class="view" data-view="ideas">
+      <form class="idea-quick" id="idea-quick-form" autocomplete="off">
+        <textarea
+          id="idea-quick-input"
+          class="idea-quick-input"
+          placeholder="冒出来的想法，先写下来再说…（Ctrl/Cmd + Enter 保存）"
+          rows="2"
+          required
+        ></textarea>
+        <div class="idea-quick-row">
+          <select id="idea-quick-tag" class="select-sm">
+            <option value="新项目想法">新项目想法</option>
+            <option value="功能改进">功能改进</option>
+            <option value="增长营销">增长营销</option>
+            <option value="技术想法">技术想法</option>
+            <option value="其他" selected>其他</option>
+          </select>
+          <select id="idea-quick-priority" class="select-sm">
+            <option value="低">低</option>
+            <option value="中" selected>中</option>
+            <option value="高">高</option>
+          </select>
+          <button type="submit" class="btn-primary">记下</button>
+        </div>
+      </form>
+
+      <div class="idea-list" id="idea-list"></div>
+      <p class="empty-hint" id="idea-empty" hidden>还没有灵感记录，先写一条试试。</p>
+    </section>
+  </main>
+
+  <!-- 项目表单弹窗 -->
+  <div class="modal" id="project-modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-panel" role="dialog" aria-modal="true">
+      <header class="modal-head">
+        <h2 id="project-modal-title">新建项目</h2>
+        <button class="icon-btn" data-close aria-label="关闭">×</button>
+      </header>
+      <form id="project-form" class="form">
+        <input type="hidden" name="id" />
+
+        <label class="field">
+          <span class="field-label">项目名称 <em>*</em></span>
+          <input name="name" type="text" required maxlength="80" />
+        </label>
+
+        <div class="field-row">
+          <label class="field">
+            <span class="field-label">状态</span>
+            <select name="status">
+              <option>构思中</option>
+              <option>开发中</option>
+              <option>已上线</option>
+              <option>暂停</option>
+              <option>已下线</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">完成度 <span class="muted" id="progress-readout">0%</span></span>
+            <input name="progress" type="range" min="0" max="100" step="5" value="0" />
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span class="field-label">域名</span>
+            <input name="domain" type="text" placeholder="example.com" />
+          </label>
+          <label class="field">
+            <span class="field-label">域名服务商</span>
+            <input name="registrar" type="text" placeholder="Namecheap / 阿里云" />
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span class="field-label">域名年费 (¥)</span>
+            <input name="domainFee" type="number" min="0" step="0.01" />
+          </label>
+          <label class="field">
+            <span class="field-label">域名到期日</span>
+            <input name="domainExpiry" type="date" />
+          </label>
+        </div>
+
+        <label class="field">
+          <span class="field-label">技术栈</span>
+          <input name="stack" type="text" placeholder="Next.js + Supabase" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">API Keys / 配置 <span class="muted">一行一条，格式 服务名=密钥</span></span>
+          <textarea name="apiKeys" rows="3" placeholder="OpenAI=sk-xxxxxxxxxxxx&#10;Stripe=sk_live_xxxxxxxx"></textarea>
+        </label>
+
+        <div class="field-row">
+          <label class="field">
+            <span class="field-label">月度成本 (¥)</span>
+            <input name="monthlyCost" type="number" min="0" step="0.01" />
+          </label>
+          <label class="field">
+            <span class="field-label">月度收入 (¥)</span>
+            <input name="monthlyRevenue" type="number" min="0" step="0.01" />
+          </label>
+        </div>
+
+        <label class="field">
+          <span class="field-label">备注 / 下一步</span>
+          <textarea name="notes" rows="3" placeholder="当前要做的事…"></textarea>
+        </label>
+
+        <footer class="form-actions">
+          <button type="button" class="btn-ghost" data-close>取消</button>
+          <button type="submit" class="btn-primary">保存</button>
+        </footer>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

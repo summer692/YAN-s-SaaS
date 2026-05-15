@@ -1,0 +1,23 @@
+/* Theme tokens. MVP 先实装白色，其他主题预留，后续切换 data-theme 即可。 */
+
+[data-theme="white"] {
+  --bg-page: #ffffff;
+  --bg-card: #fafafa;
+  --border: #ececec;
+  --text-primary: #111111;
+  --text-secondary: #555555;
+  --accent: #111111;
+  --accent-contrast: #ffffff;
+  --status-pill-bg: #f0f0f0;
+  --status-pill-text: #555555;
+
+  --status-idea-bg:    #f0f0f0; --status-idea-text:    #555555;
+  --status-dev-bg:     #ececec; --status-dev-text:     #111111;
+  --status-live-bg:    #e7f6ec; --status-live-text:    #166534;
+  --status-pause-bg:   #fff4d6; --status-pause-text:   #92400e;
+  --status-offline-bg: #fde2e2; --status-offline-text: #991b1b;
+
+  --priority-low-bg:  #f0f0f0; --priority-low-text:  #555555;
+  --priority-mid-bg:  #ececec; --priority-mid-text:  #111111;
+  --priority-high-bg: #fde2e2; --priority-high-text: #991b1b;
+}
