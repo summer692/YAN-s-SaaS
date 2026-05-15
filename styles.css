@@ -103,6 +103,7 @@ button {
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
   border-bottom: 0.5px solid var(--separator);
+  padding-top: env(safe-area-inset-top);
 }
 .header-inner {
   max-width: 760px;
@@ -363,6 +364,9 @@ button {
   max-width: 760px;
   margin: 0 auto;
   padding: var(--gap-2);
+  padding-left: max(var(--gap-2), env(safe-area-inset-left));
+  padding-right: max(var(--gap-2), env(safe-area-inset-right));
+  padding-bottom: calc(var(--gap-2) + env(safe-area-inset-bottom));
 }
 .view { display: none; }
 .view.active {
@@ -683,7 +687,7 @@ button {
   overflow-y: auto;
   background: var(--bg-elevated);
   border-radius: var(--radius-modal) var(--radius-modal) 0 0;
-  padding: var(--gap-3) var(--gap-2) var(--gap-2);
+  padding: var(--gap-3) var(--gap-2) calc(var(--gap-2) + env(safe-area-inset-bottom));
   animation: sheet-slide-up var(--t-base) var(--ease-ios);
 }
 @media (min-width: 600px) {
