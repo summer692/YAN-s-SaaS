@@ -60,6 +60,9 @@
   </style>
   <link rel="stylesheet" href="themes.css" />
   <link rel="stylesheet" href="styles.css" />
+  <!-- 构建时由 Vercel 注入 Supabase URL / key,本地默认是空值 (App 降级为 localStorage) -->
+  <script src="config.js"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
 </head>
 <body data-theme="white">
   <div id="splash" aria-hidden="true">
@@ -69,6 +72,31 @@
     </svg>
     <div class="splash-name">Atlas</div>
   </div>
+
+  <!-- 登录页 (Supabase 未配置或未登录时显示) -->
+  <section class="auth-view" id="auth-view" hidden>
+    <div class="auth-content">
+      <svg class="auth-logo" viewBox="0 0 1024 1024">
+        <circle cx="512" cy="540" r="310" fill="none" stroke="#FFFFFF" stroke-width="18" opacity="0.7"/>
+        <circle cx="676" cy="394" r="48" fill="#FFFFFF"/>
+      </svg>
+      <h1 class="auth-title">Atlas</h1>
+      <p class="auth-tagline">登录后云端同步,手机和电脑看同一份数据</p>
+      <form class="auth-form" id="auth-form" autocomplete="off">
+        <input
+          id="auth-email"
+          type="email"
+          inputmode="email"
+          autocomplete="email"
+          required
+          placeholder="你的邮箱"
+        />
+        <button type="submit" class="auth-submit">发送登录链接</button>
+      </form>
+      <p class="auth-status" id="auth-status" hidden></p>
+    </div>
+  </section>
+
   <header class="app-header">
     <div class="header-inner">
       <div class="brand">
@@ -102,6 +130,8 @@
             <button class="menu-item" data-action="export">导出 JSON</button>
             <button class="menu-item" data-action="import">导入 JSON</button>
             <button class="menu-item danger-text" data-action="clear">全部清空</button>
+            <div class="menu-divider" id="menu-divider-account" hidden></div>
+            <button class="menu-item" data-action="signout" id="menu-signout" hidden>退出登录</button>
           </div>
         </div>
         <input type="file" id="import-file" accept="application/json,.json" hidden />

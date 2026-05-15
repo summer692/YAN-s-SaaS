@@ -799,6 +799,7 @@
     if (actionBtn.dataset.action === 'export') exportData();
     if (actionBtn.dataset.action === 'import') importFile.click();
     if (actionBtn.dataset.action === 'clear') clearAll();
+    // signout 由云端模块内部直接绑定,这里不重复处理
   });
 
   applyTheme(localStorage.getItem(THEME_KEY) || 'white');
@@ -923,19 +924,106 @@
     }
   });
 
-  // ---------- Init ----------
-  renderProjects();
-  renderIdeas();
-  renderRenewals();
+  // ---------- 云端 (Supabase) + 登录态守卫 ----------
+  // 阶段 1: 只接通登录,数据仍读 localStorage。
+  // 下个 PR 才把读写都换成 Supabase + 迁移本地数据 + Realtime。
+  const cloudConfig = window.ATLAS_CONFIG || {};
+  const cloudEnabled = !!(cloudConfig.supabaseUrl && cloudConfig.supabaseKey && window.supabase);
+  const cloud = cloudEnabled
+    ? window.supabase.createClient(cloudConfig.supabaseUrl, cloudConfig.supabaseKey)
+    : null;
 
-  // 启动画面淡出：等首屏 paint 完 + 给动画一点展示时间
+  const authView = document.getElementById('auth-view');
+  const appHeader = document.querySelector('.app-header');
+  const appMainEl = document.querySelector('.app-main');
+  const menuSignout = document.getElementById('menu-signout');
+  const menuDividerAccount = document.getElementById('menu-divider-account');
+
+  function showApp() {
+    authView.hidden = true;
+    appHeader.hidden = false;
+    appMainEl.hidden = false;
+    menuSignout.hidden = !cloudEnabled;
+    menuDividerAccount.hidden = !cloudEnabled;
+    renderProjects();
+    renderIdeas();
+    renderRenewals();
+  }
+
+  function showAuth() {
+    authView.hidden = false;
+    appHeader.hidden = true;
+    appMainEl.hidden = true;
+  }
+
+  // 登录表单 ---------------------------------------------------------
+  if (cloud) {
+    const authForm = document.getElementById('auth-form');
+    const authEmail = document.getElementById('auth-email');
+    const authStatus = document.getElementById('auth-status');
+    const authSubmit = authForm.querySelector('.auth-submit');
+
+    const setStatus = (text, kind) => {
+      authStatus.hidden = !text;
+      authStatus.className = `auth-status${kind ? ' ' + kind : ''}`;
+      authStatus.textContent = text || '';
+    };
+
+    authForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = authEmail.value.trim();
+      if (!email) return;
+      authSubmit.disabled = true;
+      setStatus('正在发送…');
+      try {
+        const { error } = await cloud.auth.signInWithOtp({
+          email,
+          options: { emailRedirectTo: window.location.origin + window.location.pathname },
+        });
+        if (error) throw error;
+        setStatus(`登录链接已发到 ${email},去邮箱点一下就完事。链接 1 小时内有效。`, 'success');
+      } catch (err) {
+        setStatus(`发送失败:${err.message || err}`, 'error');
+        authSubmit.disabled = false;
+      }
+    });
+
+    // 退出登录
+    menuSignout.addEventListener('click', async () => {
+      await cloud.auth.signOut();
+    });
+
+    // 监听后续登录态变化 (例如:用户从邮件链接回到 App)
+    cloud.auth.onAuthStateChange((event, session) => {
+      if (session) showApp();
+      else {
+        authSubmit.disabled = false;
+        setStatus('', null);
+        showAuth();
+      }
+    });
+  }
+
+  // 首次启动:根据登录态决定显示哪一面 ---------------------------------
+  async function bootstrap() {
+    if (!cloud) {
+      // 没接云端 (config 空) — 单机模式,保持原行为
+      showApp();
+      return;
+    }
+    const { data: { session } } = await cloud.auth.getSession();
+    if (session) showApp();
+    else showAuth();
+  }
+  bootstrap();
+
+  // 启动画面淡出 ----------------------------------------------------
   const splash = document.getElementById('splash');
   if (splash) {
     const hide = () => {
       splash.classList.add('fade-out');
       setTimeout(() => splash.remove(), 500);
     };
-    // 首次访问展示稍长（看清 logo 动画），后续刷新更快
     const minShow = sessionStorage.getItem('splash-shown') ? 250 : 700;
     sessionStorage.setItem('splash-shown', '1');
     if (document.readyState === 'complete') {
