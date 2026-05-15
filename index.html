@@ -198,14 +198,31 @@
           </label>
         </div>
 
+        <label class="field">
+          <span class="field-label">域名到期日</span>
+          <input name="domainExpiry" type="date" />
+        </label>
+
         <div class="field-row">
           <label class="field">
-            <span class="field-label">域名年费 (¥)</span>
-            <input name="domainFee" type="number" min="0" step="0.01" />
+            <span class="field-label">域名首年费</span>
+            <div class="money-input">
+              <select name="domainFeeCurrency" class="cur-select">
+                <option value="CNY">¥</option>
+                <option value="USD">$</option>
+              </select>
+              <input name="domainFee" type="number" min="0" step="0.01" />
+            </div>
           </label>
           <label class="field">
-            <span class="field-label">域名到期日</span>
-            <input name="domainExpiry" type="date" />
+            <span class="field-label">域名续费 <span class="muted">(可选)</span></span>
+            <div class="money-input">
+              <select name="domainRenewalFeeCurrency" class="cur-select">
+                <option value="CNY">¥</option>
+                <option value="USD">$</option>
+              </select>
+              <input name="domainRenewalFee" type="number" min="0" step="0.01" />
+            </div>
           </label>
         </div>
 
