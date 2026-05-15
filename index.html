@@ -93,7 +93,7 @@
         <button type="submit" class="auth-submit">发送登录码</button>
       </form>
 
-      <!-- 第 2 步:输入 6 位数字登录码 -->
+      <!-- 第 2 步:输入登录码 (Supabase 可配置 6-10 位) -->
       <form class="auth-form" id="auth-form-code" autocomplete="off" hidden>
         <p class="auth-hint">登录码已发到 <strong id="auth-sent-email"></strong>,查收邮件后回到这里输入。</p>
         <input
@@ -101,10 +101,10 @@
           type="text"
           inputmode="numeric"
           autocomplete="one-time-code"
-          pattern="[0-9]{6}"
-          maxlength="6"
+          pattern="[0-9]{6,10}"
+          maxlength="10"
           required
-          placeholder="6 位登录码"
+          placeholder="登录码"
         />
         <button type="submit" class="auth-submit">登录</button>
         <button type="button" class="auth-secondary" id="auth-change-email">换个邮箱</button>
