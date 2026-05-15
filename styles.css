@@ -53,6 +53,86 @@ button {
               opacity var(--t-fast) var(--ease-ios);
 }
 
+/* Auth view (magic-link 登录) ----------------------------------------- */
+.auth-view {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px);
+  background: linear-gradient(180deg, #2A8AFF 0%, #1677FF 100%);
+  color: #FFFFFF;
+  -webkit-font-smoothing: antialiased;
+}
+.auth-content {
+  width: 100%;
+  max-width: 340px;
+  text-align: center;
+}
+.auth-logo {
+  width: 88px;
+  height: 88px;
+  margin: 0 auto 20px;
+  display: block;
+}
+.auth-title {
+  margin: 0 0 6px;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.6px;
+}
+.auth-tagline {
+  margin: 0 0 32px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.5;
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.auth-form input {
+  background: rgba(255, 255, 255, 0.96);
+  border: none;
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 17px;
+  color: #000;
+  outline: none;
+  font-family: inherit;
+  transition: box-shadow 0.2s var(--ease-ios);
+}
+.auth-form input::placeholder { color: rgba(0, 0, 0, 0.4); }
+.auth-form input:focus {
+  background: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.32);
+}
+.auth-submit {
+  background: #FFFFFF;
+  color: #1677FF;
+  border: none;
+  border-radius: 10px;
+  height: 50px;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity var(--t-fast) var(--ease-ios), transform 0.05s;
+}
+.auth-submit:hover { opacity: 0.92; }
+.auth-submit:disabled { opacity: 0.55; cursor: default; }
+.auth-status {
+  margin: 18px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.85);
+}
+.auth-status.success { color: #FFFFFF; font-weight: 500; }
+.auth-status.error { color: #FFD7D3; }
+
 /* PWA update banner --------------------------------------------------- */
 .update-banner {
   position: sticky;
