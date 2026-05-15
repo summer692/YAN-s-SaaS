@@ -41,6 +41,26 @@ a:hover { text-decoration: underline; }
   background: var(--accent);
   display: inline-block;
 }
+.brand-text { display: flex; flex-direction: column; gap: 2px; }
+.shortcut-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  line-height: 1.4;
+}
+.shortcut-hint kbd {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  padding: 1px 5px;
+  border: 0.5px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  margin-right: 2px;
+}
 
 .tabs { display: flex; gap: 4px; }
 .tab {
@@ -546,14 +566,6 @@ a:hover { text-decoration: underline; }
   background: var(--bg-card);
 }
 .settings-menu .danger-text { color: #991b1b; }
-.settings-hint {
-  font-size: 11px;
-  color: var(--text-secondary);
-  padding: 6px 10px 4px;
-  border-top: 0.5px solid var(--border);
-  margin-top: 4px;
-  line-height: 1.5;
-}
 
 /* Header search + renewals -------------------------------------------- */
 .header-search {
@@ -704,5 +716,6 @@ a:hover { text-decoration: underline; }
   .field-row { flex-direction: column; }
   .cards { grid-template-columns: 1fr; }
   .brand h1 { font-size: 18px; }
+  .shortcut-hint { display: none; }
   .cost-table th, .cost-table td { padding: 8px 10px; }
 }

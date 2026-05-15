@@ -1,4 +1,4 @@
-/* SaaS 指挥中心 — MVP
+/* YAN's SaaS — MVP
  * 范围：项目 CRUD、灵感 CRUD、localStorage 持久化、白色主题
  */
 (() => {

@@ -1,4 +1,4 @@
-/* SaaS 指挥中心 — Service Worker
+/* YAN's SaaS — Service Worker
  * 策略：核心静态资源 cache-first，其余 network-first 兜底缓存。 */
 
 const CACHE_VERSION = 'saas-command-v1';

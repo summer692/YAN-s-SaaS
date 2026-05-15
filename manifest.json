@@ -1,6 +1,6 @@
 {
-  "name": "SaaS 指挥中心",
-  "short_name": "SaaS Command",
+  "name": "YAN's SaaS",
+  "short_name": "YAN's SaaS",
   "description": "个人多 SaaS 项目管理 — 项目、灵感、成本、复盘一站式。",
   "start_url": "./index.html",
   "scope": "./",
