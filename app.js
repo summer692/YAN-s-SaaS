@@ -201,6 +201,8 @@
     if (p.registrar) rows.push(['服务商', escapeHtml(p.registrar)]);
     if (p.domainExpiry) rows.push(['到期日', escapeHtml(p.domainExpiry)]);
     if (p.stack) rows.push(['技术栈', escapeHtml(p.stack)]);
+    const feeText = formatDomainFee(p);
+    if (feeText) rows.push(['域名年费', feeText]);
     const cost = Number(p.monthlyCost) || 0;
     const rev = Number(p.monthlyRevenue) || 0;
     if (cost || rev) {
@@ -255,6 +257,14 @@
       notes.className = 'notes';
       notes.textContent = p.notes;
       card.append(notes);
+    }
+
+    // Footer: 创建时间
+    if (p.createdAt) {
+      const footer = document.createElement('div');
+      footer.className = 'card-footer';
+      footer.textContent = `创建于 ${formatDate(p.createdAt)}`;
+      card.append(footer);
     }
 
     // Actions
@@ -385,6 +395,9 @@
       domain: (data.domain || '').trim(),
       registrar: (data.registrar || '').trim(),
       domainFee: data.domainFee ? Number(data.domainFee) : null,
+      domainFeeCurrency: data.domainFeeCurrency === 'USD' ? 'USD' : 'CNY',
+      domainRenewalFee: data.domainRenewalFee ? Number(data.domainRenewalFee) : null,
+      domainRenewalFeeCurrency: data.domainRenewalFeeCurrency === 'USD' ? 'USD' : 'CNY',
       domainExpiry: data.domainExpiry || '',
       stack: (data.stack || '').trim(),
       apiKeys: data.apiKeys || '',
@@ -504,6 +517,30 @@
   function clamp(n, min, max) {
     return Math.min(Math.max(n, min), max);
   }
+  function currencySymbol(code) {
+    return code === 'USD' ? '$' : '¥';
+  }
+  function formatMoney(amount, currency) {
+    return `${currencySymbol(currency)}${Number(amount).toFixed(2)}`;
+  }
+  function formatDomainFee(p) {
+    const first = Number(p.domainFee);
+    const renew = Number(p.domainRenewalFee);
+    const firstCur = p.domainFeeCurrency || 'CNY';
+    const renewCur = p.domainRenewalFeeCurrency || 'CNY';
+    if (first > 0 && renew > 0) {
+      return `首年 ${formatMoney(first, firstCur)} · 续 ${formatMoney(renew, renewCur)}`;
+    }
+    if (first > 0) return `${formatMoney(first, firstCur)} / 年`;
+    if (renew > 0) return `${formatMoney(renew, renewCur)} / 年`;
+    return '';
+  }
+  function formatDate(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -533,13 +570,29 @@
     const totalCost = sum(projects.map((p) => Number(p.monthlyCost) || 0));
     const totalRev = sum(projects.map((p) => Number(p.monthlyRevenue) || 0));
     const net = totalRev - totalCost;
-    const yearlyDomain = sum(projects.map((p) => Number(p.domainFee) || 0));
+
+    // 年费按币种分别汇总；优先用续费价（反映长期成本），没续费的用首年价
+    const yearlyByCur = { CNY: 0, USD: 0 };
+    projects.forEach((p) => {
+      const renew = Number(p.domainRenewalFee) || 0;
+      const first = Number(p.domainFee) || 0;
+      const amount = renew > 0 ? renew : first;
+      if (amount <= 0) return;
+      const cur = renew > 0
+        ? (p.domainRenewalFeeCurrency || 'CNY')
+        : (p.domainFeeCurrency || 'CNY');
+      yearlyByCur[cur === 'USD' ? 'USD' : 'CNY'] += amount;
+    });
+    const yearlyParts = [];
+    if (yearlyByCur.CNY > 0) yearlyParts.push(`¥${yearlyByCur.CNY.toFixed(2)}`);
+    if (yearlyByCur.USD > 0) yearlyParts.push(`$${yearlyByCur.USD.toFixed(2)}`);
+    const yearlyDisplay = yearlyParts.length ? yearlyParts.join(' + ') : '¥0.00';
 
     costMetrics.innerHTML = [
       metricCard('月度总成本', `¥ ${totalCost.toFixed(2)}`),
       metricCard('月度总收入', `¥ ${totalRev.toFixed(2)}`),
       metricCard('月度净利', `${net >= 0 ? '+' : '-'} ¥ ${Math.abs(net).toFixed(2)}`, net >= 0 ? 'positive' : 'negative'),
-      metricCard('域名年费总和', `¥ ${yearlyDomain.toFixed(2)}`),
+      metricCard('域名年费总和', yearlyDisplay),
     ].join('');
 
     costEmpty.hidden = projects.length > 0;
@@ -613,7 +666,10 @@
       lines.push('');
       lines.push(`### ${idx + 1}. ${p.name}`);
       lines.push(`- 状态: ${p.status || '构思中'} · 完成度 ${p.progress || 0}%`);
+      if (p.createdAt) lines.push(`- 创建于: ${formatDate(p.createdAt)}`);
       if (p.domain) lines.push(`- 域名: ${p.domain}${p.domainExpiry ? ` (到期 ${p.domainExpiry})` : ''}`);
+      const feeText = formatDomainFee(p);
+      if (feeText) lines.push(`- 域名年费: ${feeText}`);
       if (p.stack) lines.push(`- 技术栈: ${p.stack}`);
       const c = Number(p.monthlyCost) || 0;
       const r = Number(p.monthlyRevenue) || 0;
