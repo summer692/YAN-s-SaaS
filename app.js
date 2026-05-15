@@ -31,7 +31,128 @@
   }
 
   function uid() {
+    // 优先用 UUID (Supabase 主键格式),老浏览器降级
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  // ---------- 云端存储 (Supabase) ----------
+  // currentUserId 由登录流程设置 (见文件末尾的 enterCloudMode)。
+  // 未登录或没接云端时为 null,所有 persist/remove 自动降级到 localStorage。
+  let currentUserId = null;
+
+  function projectToRow(p, userId) {
+    return {
+      id: UUID_RE.test(p.id) ? p.id : undefined,
+      user_id: userId,
+      name: p.name,
+      status: p.status || '构思中',
+      progress: Number(p.progress) || 0,
+      domain: p.domain || '',
+      registrar: p.registrar || '',
+      domain_expiry: p.domainExpiry || null,
+      domain_fee: p.domainFee ?? null,
+      domain_fee_currency: p.domainFeeCurrency || 'CNY',
+      domain_renewal_fee: p.domainRenewalFee ?? null,
+      domain_renewal_fee_currency: p.domainRenewalFeeCurrency || 'CNY',
+      stack: p.stack || '',
+      api_keys_cipher: p.apiKeys || '',  // Phase 3 加 PIN 加密;现在是明文,RLS 保证只有自己能读
+      monthly_cost: Number(p.monthlyCost) || 0,
+      monthly_revenue: Number(p.monthlyRevenue) || 0,
+      notes: p.notes || '',
+    };
+  }
+  function rowToProject(r) {
+    return {
+      id: r.id,
+      name: r.name,
+      status: r.status,
+      progress: r.progress,
+      domain: r.domain || '',
+      registrar: r.registrar || '',
+      domainExpiry: r.domain_expiry || '',
+      domainFee: r.domain_fee != null ? Number(r.domain_fee) : null,
+      domainFeeCurrency: r.domain_fee_currency || 'CNY',
+      domainRenewalFee: r.domain_renewal_fee != null ? Number(r.domain_renewal_fee) : null,
+      domainRenewalFeeCurrency: r.domain_renewal_fee_currency || 'CNY',
+      stack: r.stack || '',
+      apiKeys: r.api_keys_cipher || '',
+      monthlyCost: Number(r.monthly_cost) || 0,
+      monthlyRevenue: Number(r.monthly_revenue) || 0,
+      notes: r.notes || '',
+      createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+      updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : Date.now(),
+    };
+  }
+  function ideaToRow(i, userId) {
+    return {
+      id: UUID_RE.test(i.id) ? i.id : undefined,
+      user_id: userId,
+      content: i.content,
+      tag: i.tag || '其他',
+      priority: i.priority || '中',
+    };
+  }
+  function rowToIdea(r) {
+    return {
+      id: r.id,
+      content: r.content,
+      tag: r.tag || '其他',
+      priority: r.priority || '中',
+      createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+    };
+  }
+
+  async function cloudLoadAll(userId) {
+    const [pRes, iRes] = await Promise.all([
+      window.supabase ? cloud.from('projects').select('*').eq('user_id', userId) : Promise.resolve({ data: [] }),
+      window.supabase ? cloud.from('ideas').select('*').eq('user_id', userId) : Promise.resolve({ data: [] }),
+    ]);
+    if (pRes.error) console.error('cloudLoadAll projects:', pRes.error);
+    if (iRes.error) console.error('cloudLoadAll ideas:', iRes.error);
+    return {
+      projects: (pRes.data || []).map(rowToProject),
+      ideas: (iRes.data || []).map(rowToIdea),
+    };
+  }
+
+  function cloudError(label, error) {
+    console.error(label, error);
+    alert(`${label}:${error.message || error}`);
+  }
+
+  async function persistProject(p) {
+    if (!currentUserId) { save(); return; }
+    const row = projectToRow(p, currentUserId);
+    const { data, error } = await cloud.from('projects').upsert(row).select().single();
+    if (error) { cloudError('保存项目失败', error); return; }
+    const updated = rowToProject(data);
+    const idx = state.projects.findIndex((x) => x.id === p.id || x.id === updated.id);
+    if (idx >= 0) state.projects[idx] = updated;
+    else state.projects.push(updated);
+  }
+  async function removeProjectRemote(id) {
+    if (!currentUserId) { save(); return; }
+    const { error } = await cloud.from('projects').delete().eq('id', id);
+    if (error) cloudError('删除项目失败', error);
+  }
+  async function persistIdea(i) {
+    if (!currentUserId) { save(); return; }
+    const row = ideaToRow(i, currentUserId);
+    const { data, error } = await cloud.from('ideas').upsert(row).select().single();
+    if (error) { cloudError('保存灵感失败', error); return; }
+    const updated = rowToIdea(data);
+    const idx = state.ideas.findIndex((x) => x.id === i.id || x.id === updated.id);
+    if (idx >= 0) state.ideas[idx] = updated;
+    else state.ideas.push(updated);
+  }
+  async function removeIdeaRemote(id) {
+    if (!currentUserId) { save(); return; }
+    const { error } = await cloud.from('ideas').delete().eq('id', id);
+    if (error) cloudError('删除灵感失败', error);
   }
 
   // ---------- Tab switching ----------
@@ -335,9 +456,9 @@
     if (!p) return;
     if (!confirm(`确定删除项目「${p.name}」？此操作不可恢复。`)) return;
     state.projects = state.projects.filter((x) => x.id !== id);
-    save();
     renderProjects();
     renderRenewals();
+    removeProjectRemote(id);  // 后端真删,失败时控制台会报但不阻塞 UI
   }
 
   // ---------- Project modal ----------
@@ -380,7 +501,7 @@
     projectModal.hidden = true;
   }
 
-  projectForm.addEventListener('submit', (e) => {
+  projectForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(projectForm);
     const data = Object.fromEntries(fd.entries());
@@ -415,10 +536,13 @@
     } else {
       state.projects.push(project);
     }
-    save();
     renderProjects();
     renderRenewals();
     closeProjectModal();
+    // 持久化 (cloud 模式时把 DB 回写的真实 id/时间戳合并回 state,然后再渲染一次)
+    await persistProject(project);
+    renderProjects();
+    renderRenewals();
   });
 
   // ---------- Ideas ----------
@@ -429,20 +553,22 @@
   const ideaTag = document.getElementById('idea-quick-tag');
   const ideaPriority = document.getElementById('idea-quick-priority');
 
-  ideaForm.addEventListener('submit', (e) => {
+  ideaForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const content = ideaInput.value.trim();
     if (!content) return;
-    state.ideas.push({
+    const idea = {
       id: uid(),
       content,
       tag: ideaTag.value,
       priority: ideaPriority.value,
       createdAt: Date.now(),
-    });
-    save();
+    };
+    state.ideas.push(idea);
     ideaInput.value = '';
     ideaInput.focus();
+    renderIdeas();
+    await persistIdea(idea);
     renderIdeas();
   });
 
@@ -509,8 +635,8 @@
   function deleteIdea(id) {
     if (!confirm('删除这条灵感？')) return;
     state.ideas = state.ideas.filter((x) => x.id !== id);
-    save();
     renderIdeas();
+    removeIdeaRemote(id);
   }
 
   // ---------- Utilities ----------
@@ -827,10 +953,29 @@
         state.projects = projects;
         state.ideas = ideas;
       }
-      save();
       renderProjects();
       renderIdeas();
       renderRenewals();
+      if (currentUserId) {
+        // 云端模式:整批 upsert 到 Supabase
+        if (!mode) {
+          // 覆盖模式:先清云端所有数据
+          await cloud.from('projects').delete().eq('user_id', currentUserId);
+          await cloud.from('ideas').delete().eq('user_id', currentUserId);
+        }
+        if (projects.length) {
+          const { error } = await cloud.from('projects')
+            .upsert(projects.map((p) => projectToRow(p, currentUserId)));
+          if (error) cloudError('导入项目失败', error);
+        }
+        if (ideas.length) {
+          const { error } = await cloud.from('ideas')
+            .upsert(ideas.map((i) => ideaToRow(i, currentUserId)));
+          if (error) cloudError('导入灵感失败', error);
+        }
+      } else {
+        save();
+      }
       alert('导入成功。');
     } catch (err) {
       alert(`导入失败：${err.message || err}`);
@@ -861,15 +1006,20 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  function clearAll() {
+  async function clearAll() {
     if (!confirm('确定清空所有项目和灵感？此操作不可恢复。建议先「导出 JSON」备份。')) return;
     if (!confirm('再次确认：真的全部清空？')) return;
     state.projects = [];
     state.ideas = [];
-    save();
     renderProjects();
     renderIdeas();
     renderRenewals();
+    if (currentUserId) {
+      await cloud.from('projects').delete().eq('user_id', currentUserId);
+      await cloud.from('ideas').delete().eq('user_id', currentUserId);
+    } else {
+      save();
+    }
   }
 
   document.addEventListener('click', (e) => {
@@ -956,6 +1106,18 @@
     appMainEl.hidden = true;
   }
 
+  // 登录页两步表单的可见性切换 (外层定义,因为 exitCloudMode 也要用)
+  function showEmailStep() {
+    const formEmail = document.getElementById('auth-form-email');
+    const formCode = document.getElementById('auth-form-code');
+    const code = document.getElementById('auth-code');
+    const status = document.getElementById('auth-status');
+    if (formEmail) formEmail.hidden = false;
+    if (formCode) formCode.hidden = true;
+    if (code) code.value = '';
+    if (status) { status.hidden = true; status.textContent = ''; }
+  }
+
   // 登录表单 ---------------------------------------------------------
   // 两段式:邮箱 → 6 位登录码
   // (用 OTP code 而非 magic link,因为 iOS 邮件里点链接会跳 Safari,
@@ -979,13 +1141,11 @@
       authStatus.textContent = text || '';
     };
 
-    const showEmailStep = () => {
-      authFormEmail.hidden = false;
-      authFormCode.hidden = true;
+    // 内部版本:除了切换可见性,还重置 submit 按钮 disabled 态
+    const resetEmailStep = () => {
+      showEmailStep();
       authSubmitEmail.disabled = false;
       authSubmitCode.disabled = false;
-      authCode.value = '';
-      setStatus('', null);
     };
     const showCodeStep = (email) => {
       authFormEmail.hidden = true;
@@ -1058,7 +1218,7 @@
     // 换邮箱按钮:回到第 1 步
     authChangeEmail.addEventListener('click', () => {
       pendingEmail = '';
-      showEmailStep();
+      resetEmailStep();
     });
 
     // 退出登录
@@ -1067,13 +1227,104 @@
     });
 
     // 监听登录态变化
-    cloud.auth.onAuthStateChange((event, session) => {
-      if (session) showApp();
-      else {
-        showEmailStep();
-        showAuth();
-      }
+    cloud.auth.onAuthStateChange(async (event, session) => {
+      if (session) await enterCloudMode(session.user.id);
+      else exitCloudMode();
     });
+  }
+
+  // 实时订阅 (Realtime) -------------------------------------------------
+  let realtimeChannel = null;
+  function setupRealtime(userId) {
+    if (!cloud) return;
+    if (realtimeChannel) cloud.removeChannel(realtimeChannel);
+    realtimeChannel = cloud
+      .channel(`atlas-${userId}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'projects', filter: `user_id=eq.${userId}` },
+        handleProjectChange)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'ideas', filter: `user_id=eq.${userId}` },
+        handleIdeaChange)
+      .subscribe();
+  }
+  function handleProjectChange(payload) {
+    const t = payload.eventType;
+    if (t === 'INSERT' || t === 'UPDATE') {
+      const p = rowToProject(payload.new);
+      const idx = state.projects.findIndex((x) => x.id === p.id);
+      if (idx >= 0) state.projects[idx] = p; else state.projects.push(p);
+    } else if (t === 'DELETE') {
+      state.projects = state.projects.filter((x) => x.id !== payload.old.id);
+    }
+    renderProjects();
+    renderRenewals();
+  }
+  function handleIdeaChange(payload) {
+    const t = payload.eventType;
+    if (t === 'INSERT' || t === 'UPDATE') {
+      const i = rowToIdea(payload.new);
+      const idx = state.ideas.findIndex((x) => x.id === i.id);
+      if (idx >= 0) state.ideas[idx] = i; else state.ideas.push(i);
+    } else if (t === 'DELETE') {
+      state.ideas = state.ideas.filter((x) => x.id !== payload.old.id);
+    }
+    renderIdeas();
+  }
+
+  // 本地 → 云端迁移 (仅首次登录后,本地有数据 + 云端为空时触发) ----------
+  async function maybeMigrateLocalToCloud(userId) {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    let local;
+    try { local = JSON.parse(raw); } catch (e) { return; }
+    const localProjects = Array.isArray(local.projects) ? local.projects : [];
+    const localIdeas = Array.isArray(local.ideas) ? local.ideas : [];
+    if (localProjects.length + localIdeas.length === 0) {
+      localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    // 云端已有任意数据 → 跳过迁移避免重复
+    const cloudData = await cloudLoadAll(userId);
+    if (cloudData.projects.length + cloudData.ideas.length > 0) {
+      localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    const msg = `检测到这台设备的本地有 ${localProjects.length} 个项目、${localIdeas.length} 条灵感 (云端目前是空的)。\n\n上传到云端?\n\n• 确定: 上传后两台设备都能同步看到\n• 取消: 抛弃本地数据,从空白开始用云端`;
+    if (confirm(msg)) {
+      if (localProjects.length) {
+        const rows = localProjects.map((p) => projectToRow(p, userId));
+        const { error } = await cloud.from('projects').insert(rows);
+        if (error) cloudError('上传项目失败', error);
+      }
+      if (localIdeas.length) {
+        const rows = localIdeas.map((i) => ideaToRow(i, userId));
+        const { error } = await cloud.from('ideas').insert(rows);
+        if (error) cloudError('上传灵感失败', error);
+      }
+    }
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
+  // 进入云端模式 (首次登录 或 onAuthStateChange 触发 SIGNED_IN) ----------
+  async function enterCloudMode(userId) {
+    if (currentUserId === userId) return;  // 防重复触发
+    currentUserId = userId;
+    await maybeMigrateLocalToCloud(userId);
+    const data = await cloudLoadAll(userId);
+    state = data;
+    setupRealtime(userId);
+    showApp();
+  }
+  function exitCloudMode() {
+    if (realtimeChannel) {
+      cloud.removeChannel(realtimeChannel);
+      realtimeChannel = null;
+    }
+    currentUserId = null;
+    state = { projects: [], ideas: [] };
+    showEmailStep();
+    showAuth();
   }
 
   // 首次启动:根据登录态决定显示哪一面 ---------------------------------
@@ -1084,7 +1335,7 @@
       return;
     }
     const { data: { session } } = await cloud.auth.getSession();
-    if (session) showApp();
+    if (session) await enterCloudMode(session.user.id);
     else showAuth();
   }
   bootstrap();
