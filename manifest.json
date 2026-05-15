@@ -1,7 +1,7 @@
 {
-  "name": "YAN's SaaS",
-  "short_name": "YAN's SaaS",
-  "description": "个人多 SaaS 项目管理 — 项目、灵感、成本、复盘一站式。",
+  "name": "Atlas",
+  "short_name": "Atlas",
+  "description": "Atlas · 项目地图 — 俯瞰你的所有 SaaS 项目：项目、灵感、成本、复盘一站式。",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
