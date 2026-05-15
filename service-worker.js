@@ -1,4 +1,4 @@
-/* YAN's SaaS — Service Worker
+/* Atlas — Service Worker
  * 缓存策略：核心静态资源 cache-first + 后台静默刷新。
  * 更新策略：新 SW 安装后进入 waiting 状态，由页面 postMessage SKIP_WAITING
  *           来激活，避免打断正在使用的用户。下次冷启动也会自动激活。
@@ -6,7 +6,7 @@
  * 部署提示：每次推送代码请把 CACHE_VERSION 的数字 +1，否则浏览器不会发现
  *           SW 文件变化，新版本不会被检测到。 */
 
-const CACHE_VERSION = 'saas-command-v6';
+const CACHE_VERSION = 'atlas-v7';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -16,6 +16,9 @@ const CORE_ASSETS = [
   './manifest.json',
   './icons/icon.svg',
   './icons/icon-maskable.svg',
+  './icons/icon-a.svg',
+  './icons/icon-b.svg',
+  './icons/icon-c.svg',
 ];
 
 self.addEventListener('install', (event) => {

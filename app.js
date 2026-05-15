@@ -1,4 +1,4 @@
-/* YAN's SaaS — MVP
+/* Atlas · 项目地图 — App 逻辑
  * 范围：项目 CRUD、灵感 CRUD、localStorage 持久化、白色主题
  */
 (() => {

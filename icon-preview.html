@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atlas 图标方案预览</title>
+<style>
+  body {
+    margin: 0;
+    padding: 32px 16px 64px;
+    background: #F2F2F7;
+    color: #000;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1 { text-align: center; font-weight: 700; font-size: 28px; margin: 0 0 8px; letter-spacing: -0.5px; }
+  .sub { text-align: center; color: rgba(60,60,67,0.6); font-size: 15px; margin-bottom: 32px; }
+  .grid { display: grid; gap: 24px; max-width: 880px; margin: 0 auto; }
+  .card {
+    background: #FFFFFF;
+    border-radius: 14px;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  @media (min-width: 640px) {
+    .card { grid-template-columns: auto 1fr; align-items: center; gap: 28px; }
+  }
+  .preview { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .sizes { display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+  .size-item { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .size-label { font-size: 11px; color: rgba(60,60,67,0.6); }
+  .icon-big   { width: 120px; height: 120px; border-radius: 27px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+  .icon-mid   { width: 60px;  height: 60px;  border-radius: 13px; overflow: hidden; box-shadow: 0 3px 8px rgba(0,0,0,0.1); }
+  .icon-small { width: 32px;  height: 32px;  border-radius: 7px;  overflow: hidden; }
+  .info h2 { margin: 0 0 6px; font-size: 22px; font-weight: 600; letter-spacing: -0.2px; }
+  .info p { margin: 0 0 12px; font-size: 15px; line-height: 1.5; color: rgba(60,60,67,0.7); }
+  .pick {
+    display: inline-block;
+    background: #007AFF;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .home-mock {
+    background: linear-gradient(180deg, #fff 0%, #fff 100%);
+    border-radius: 24px;
+    padding: 16px;
+    display: inline-grid;
+    grid-template-columns: repeat(4, 60px);
+    gap: 18px 14px;
+    margin-top: 8px;
+  }
+  .home-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .home-cell .lbl { font-size: 10px; color: #000; }
+  .placeholder { width: 60px; height: 60px; border-radius: 13px; background: #E5E5EA; }
+</style>
+</head>
+<body>
+  <h1>Atlas 图标方案</h1>
+  <p class="sub">三个方向，挑一个告诉我 A / B / C</p>
+
+  <div class="grid">
+    <div class="card">
+      <div class="preview">
+        <div class="sizes">
+          <div class="size-item"><div class="icon-big"><img src="icons/icon-a.svg" width="120" height="120" alt=""></div><span class="size-label">120px</span></div>
+          <div class="size-item"><div class="icon-mid"><img src="icons/icon-a.svg" width="60" height="60" alt=""></div><span class="size-label">60px (主屏)</span></div>
+          <div class="size-item"><div class="icon-small"><img src="icons/icon-a.svg" width="32" height="32" alt=""></div><span class="size-label">32px (浏览器 tab)</span></div>
+        </div>
+      </div>
+      <div class="info">
+        <h2>方案 A · 指南针</h2>
+        <p>4 个三角形朝向四方，北向高亮，中心有蓝色小点像指针轴。「方向 / 俯瞰」的隐喻最直接，工程师风格强。</p>
+        <div class="home-mock">
+          <div class="home-cell"><div class="placeholder"></div><div class="lbl">日历</div></div>
+          <div class="home-cell"><div class="icon-mid"><img src="icons/icon-a.svg" width="60" height="60" alt=""></div><div class="lbl">Atlas</div></div>
+          <div class="home-cell"><div class="placeholder"></div><div class="lbl">备忘录</div></div>
+          <div class="home-cell"><div class="placeholder"></div><div class="lbl">地图</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="preview">
+        <div class="sizes">
+          <div class="size-item"><div class="icon-big"><img src="icons/icon-b.svg" width="120" height="120" alt=""></div><span class="size-label">120px</span></div>
+          <div class="size-item"><div class="icon-mid"><img src="icons/icon-b.svg" width="60" height="60" alt=""></div><span class="size-label">60px (主屏)</span></div>
+          <div class="size-item"><div class="icon-small"><img src="icons/icon-b.svg" width="32" height="32" alt=""></div><span class="size-label">32px (浏览器 tab)</span></div>
+        </div>
+      </div>
+      <div class="info">
+        <h2>方案 B · A 字 + 地平线</h2>
+        <p>抽象「A」字形像一座山峰，下方一条横线是地平线。一笔一划都不多余，最克制、最有 Apple 自家产品气质。</p>
+        <div class="home-mock">
+          <div class="home-cell"><div class="placeholder"></div><div class="lbl">日历</div></div>
+          <div class="home-cell"><div class="icon-mid"><img src="icons/icon-b.svg" width="60" height="60" alt=""></div><div class="lbl">Atlas</div></div>
+          <div class="home-cell"><div class="placeholder"></div><div class="lbl">备忘录</div></div>
+          <div class="home-cell"><div class="placeholder"></div><div class="lbl">地图</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="preview">
+        <div class="sizes">
+          <div class="size-item"><div class="icon-big"><img src="icons/icon-c.svg" width="120" height="120" alt=""></div><span class="size-label">120px</span></div>
+          <div class="size-item"><div class="icon-mid"><img src="icons/icon-c.svg" width="60" height="60" alt=""></div><span class="size-label">60px (主屏)</span></div>
+          <div class="size-item"><div class="icon-small"><img src="icons/icon-c.svg" width="32" height="32" alt=""></div><span class="size-label">32px (浏览器 tab)</span></div>
+        </div>
+      </div>
+      <div class="info">
+        <h2>方案 C · 等高线</h2>
+        <p>4 圈逐渐淡出的椭圆，像地形图的等高线、也像水面涟漪。最柔和、最有「地图 / 高空俯瞰」的氛围。</p>
+        <div class="home-mock">
+          <div class="home-cell"><div class="placeholder"></div><div class="lbl">日历</div></div>
+          <div class="home-cell"><div class="icon-mid"><img src="icons/icon-c.svg" width="60" height="60" alt=""></div><div class="lbl">Atlas</div></div>
+          <div class="home-cell"><div class="placeholder"></div><div class="lbl">备忘录</div></div>
+          <div class="home-cell"><div class="placeholder"></div><div class="lbl">地图</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
