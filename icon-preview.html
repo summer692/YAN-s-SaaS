@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Atlas 图标方案预览</title>
+<title>Atlas 图标方案 · 蓝绿变体</title>
 <style>
   body {
     margin: 0;
@@ -14,7 +14,7 @@
     -webkit-font-smoothing: antialiased;
   }
   h1 { text-align: center; font-weight: 700; font-size: 28px; margin: 0 0 8px; letter-spacing: -0.5px; }
-  .sub { text-align: center; color: rgba(60,60,67,0.6); font-size: 15px; margin-bottom: 32px; }
+  .sub { text-align: center; color: rgba(60,60,67,0.6); font-size: 15px; margin-bottom: 32px; max-width: 560px; margin-left: auto; margin-right: auto; }
   .grid { display: grid; gap: 24px; max-width: 880px; margin: 0 auto; }
   .card {
     background: #FFFFFF;
@@ -36,16 +36,6 @@
   .icon-small { width: 32px;  height: 32px;  border-radius: 7px;  overflow: hidden; }
   .info h2 { margin: 0 0 6px; font-size: 22px; font-weight: 600; letter-spacing: -0.2px; }
   .info p { margin: 0 0 12px; font-size: 15px; line-height: 1.5; color: rgba(60,60,67,0.7); }
-  .pick {
-    display: inline-block;
-    background: #007AFF;
-    color: white;
-    padding: 8px 16px;
-    border-radius: 10px;
-    font-size: 14px;
-    font-weight: 600;
-    text-decoration: none;
-  }
   .home-mock {
     background: linear-gradient(180deg, #fff 0%, #fff 100%);
     border-radius: 24px;
@@ -58,72 +48,96 @@
   .home-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; }
   .home-cell .lbl { font-size: 10px; color: #000; }
   .placeholder { width: 60px; height: 60px; border-radius: 13px; background: #E5E5EA; }
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-left: 8px;
+    background: rgba(20, 184, 134, 0.14);
+    color: #0D7A55;
+    vertical-align: middle;
+  }
 </style>
 </head>
 <body>
-  <h1>Atlas 图标方案 (第二轮)</h1>
-  <p class="sub">这次走层次 / 字标 / 极简三个不同方向。挑一个告诉我 A / B / C</p>
+  <h1>Atlas · 蓝绿配色变体</h1>
+  <p class="sub">沿用你选的 C 方案（圆 + 偏心点）。挑一个：<strong>C1 / C2 / C3 / C4</strong>。我建议把 C3 或 C4 当 baseline 看 —— 白色点比彩色点更耐看。</p>
 
   <div class="grid">
+
     <div class="card">
       <div class="preview">
         <div class="sizes">
-          <div class="size-item"><div class="icon-big"><img src="icons/icon-a.svg" width="120" height="120" alt=""></div><span class="size-label">120px</span></div>
-          <div class="size-item"><div class="icon-mid"><img src="icons/icon-a.svg" width="60" height="60" alt=""></div><span class="size-label">60px (主屏)</span></div>
-          <div class="size-item"><div class="icon-small"><img src="icons/icon-a.svg" width="32" height="32" alt=""></div><span class="size-label">32px (浏览器 tab)</span></div>
+          <div class="size-item"><div class="icon-big"><img src="icons/icon-c1.svg" width="120" height="120" alt=""></div><span class="size-label">120px</span></div>
+          <div class="size-item"><div class="icon-mid"><img src="icons/icon-c1.svg" width="60" height="60" alt=""></div><span class="size-label">60px</span></div>
+          <div class="size-item"><div class="icon-small"><img src="icons/icon-c1.svg" width="32" height="32" alt=""></div><span class="size-label">32px</span></div>
         </div>
       </div>
       <div class="info">
-        <h2>方案 A · 层叠山脉</h2>
-        <p>三座山峰按前-中-后层叠，前峰实白、中峰 62%、后峰 32% 不透明度，自然产生空气感和景深。底部一条极细横线作地平。比单峰更有「俯瞰」气场，比指南针更有诗意。</p>
-        <div class="home-mock">
-          <div class="home-cell"><div class="placeholder"></div><div class="lbl">日历</div></div>
-          <div class="home-cell"><div class="icon-mid"><img src="icons/icon-a.svg" width="60" height="60" alt=""></div><div class="lbl">Atlas</div></div>
-          <div class="home-cell"><div class="placeholder"></div><div class="lbl">备忘录</div></div>
-          <div class="home-cell"><div class="placeholder"></div><div class="lbl">地图</div></div>
-        </div>
+        <h2>C1 · 蓝底 + 绿点</h2>
+        <p>深海军蓝 (<code>#142B55</code>) + 翡翠绿点 (<code>#14B886</code>)。绿点像深夜里的极光信标，最有「数字 / 科技 / 创业」气质。能量感最强但风险也最大 —— 绿色过艳容易降级。我用了偏冷的翡翠绿避免过亮。</p>
       </div>
     </div>
 
     <div class="card">
       <div class="preview">
         <div class="sizes">
-          <div class="size-item"><div class="icon-big"><img src="icons/icon-b.svg" width="120" height="120" alt=""></div><span class="size-label">120px</span></div>
-          <div class="size-item"><div class="icon-mid"><img src="icons/icon-b.svg" width="60" height="60" alt=""></div><span class="size-label">60px (主屏)</span></div>
-          <div class="size-item"><div class="icon-small"><img src="icons/icon-b.svg" width="32" height="32" alt=""></div><span class="size-label">32px (浏览器 tab)</span></div>
+          <div class="size-item"><div class="icon-big"><img src="icons/icon-c2.svg" width="120" height="120" alt=""></div><span class="size-label">120px</span></div>
+          <div class="size-item"><div class="icon-mid"><img src="icons/icon-c2.svg" width="60" height="60" alt=""></div><span class="size-label">60px</span></div>
+          <div class="size-item"><div class="icon-small"><img src="icons/icon-c2.svg" width="32" height="32" alt=""></div><span class="size-label">32px</span></div>
         </div>
       </div>
       <div class="info">
-        <h2>方案 B · 字母 A · 深夜墨</h2>
-        <p>深海军蓝渐变背景配米白色「A」，像精装书的烫金封面或 Linear / Notion 那种品牌字标。<strong>放弃 iOS 蓝、改用更高级的深色 + 暖白对比</strong>。三笔几何，自信不张扬。最像独立软件公司的「自家产品」。</p>
-        <div class="home-mock">
-          <div class="home-cell"><div class="placeholder"></div><div class="lbl">日历</div></div>
-          <div class="home-cell"><div class="icon-mid"><img src="icons/icon-b.svg" width="60" height="60" alt=""></div><div class="lbl">Atlas</div></div>
-          <div class="home-cell"><div class="placeholder"></div><div class="lbl">备忘录</div></div>
-          <div class="home-cell"><div class="placeholder"></div><div class="lbl">地图</div></div>
-        </div>
+        <h2>C2 · 绿底 + 蓝点</h2>
+        <p>深森林绿 (<code>#154734</code>) + 柔和钢青蓝点 (<code>#4A9BE0</code>)。最不常见的组合 —— 主屏上一眼能挑出来，独立软件感强。蓝点选了偏雾的色调避免过 IT 蓝。</p>
       </div>
     </div>
 
     <div class="card">
       <div class="preview">
         <div class="sizes">
-          <div class="size-item"><div class="icon-big"><img src="icons/icon-c.svg" width="120" height="120" alt=""></div><span class="size-label">120px</span></div>
-          <div class="size-item"><div class="icon-mid"><img src="icons/icon-c.svg" width="60" height="60" alt=""></div><span class="size-label">60px (主屏)</span></div>
-          <div class="size-item"><div class="icon-small"><img src="icons/icon-c.svg" width="32" height="32" alt=""></div><span class="size-label">32px (浏览器 tab)</span></div>
+          <div class="size-item"><div class="icon-big"><img src="icons/icon-c3.svg" width="120" height="120" alt=""></div><span class="size-label">120px</span></div>
+          <div class="size-item"><div class="icon-mid"><img src="icons/icon-c3.svg" width="60" height="60" alt=""></div><span class="size-label">60px</span></div>
+          <div class="size-item"><div class="icon-small"><img src="icons/icon-c3.svg" width="32" height="32" alt=""></div><span class="size-label">32px</span></div>
         </div>
       </div>
       <div class="info">
-        <h2>方案 C · 米黄底 · 单圆与点</h2>
-        <p>暖米色背景 + 海军蓝细线圆 + 偏心一个小实心点。圆是「世界」，点是「你在哪」。<strong>极简到近乎奢侈</strong>，留白多、对比柔和。像古董星图、像 Aesop 的产品标签 —— 一眼看出主人「不在乎」热闹。和方案 B 是反向选择：B 是深色字标，C 是浅色图形。</p>
-        <div class="home-mock">
-          <div class="home-cell"><div class="placeholder"></div><div class="lbl">日历</div></div>
-          <div class="home-cell"><div class="icon-mid"><img src="icons/icon-c.svg" width="60" height="60" alt=""></div><div class="lbl">Atlas</div></div>
-          <div class="home-cell"><div class="placeholder"></div><div class="lbl">备忘录</div></div>
-          <div class="home-cell"><div class="placeholder"></div><div class="lbl">地图</div></div>
+        <h2>C3 · 绿底 + 白点 <span class="tag">推荐</span></h2>
+        <p>深森林绿渐变 (<code>#1B5742 → #0E3326</code>) + 纯白点。森林绿是很多奢侈品牌（Bottega、Loro Piana 包装）的主色 —— 内敛、有重量。白点比彩色点更耐看，过 5 年也不会觉得过时。</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="preview">
+        <div class="sizes">
+          <div class="size-item"><div class="icon-big"><img src="icons/icon-c4.svg" width="120" height="120" alt=""></div><span class="size-label">120px</span></div>
+          <div class="size-item"><div class="icon-mid"><img src="icons/icon-c4.svg" width="60" height="60" alt=""></div><span class="size-label">60px</span></div>
+          <div class="size-item"><div class="icon-small"><img src="icons/icon-c4.svg" width="32" height="32" alt=""></div><span class="size-label">32px</span></div>
         </div>
+      </div>
+      <div class="info">
+        <h2>C4 · 蓝底 + 白点 <span class="tag">推荐</span></h2>
+        <p>深夜海军蓝 (<code>#0F2747 → #081832</code>) + 纯白点。最经典的航海 / 制图美学配色，像安卓上的 Sleep cycle、像 Apple Weather 晚间模式。比 C3 更冷静、更通用，最不容易踩雷。</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="grid" style="margin-top: 32px;">
+    <div class="card" style="display:block; padding: 20px 24px;">
+      <h2 style="margin:0 0 12px; font-size: 17px; font-weight: 600;">四个一起对比 (实际主屏尺寸)</h2>
+      <div class="home-mock" style="grid-template-columns: repeat(4, 60px);">
+        <div class="home-cell"><div class="icon-mid"><img src="icons/icon-c1.svg" width="60" height="60" alt=""></div><div class="lbl">C1</div></div>
+        <div class="home-cell"><div class="icon-mid"><img src="icons/icon-c2.svg" width="60" height="60" alt=""></div><div class="lbl">C2</div></div>
+        <div class="home-cell"><div class="icon-mid"><img src="icons/icon-c3.svg" width="60" height="60" alt=""></div><div class="lbl">C3</div></div>
+        <div class="home-cell"><div class="icon-mid"><img src="icons/icon-c4.svg" width="60" height="60" alt=""></div><div class="lbl">C4</div></div>
       </div>
     </div>
   </div>
+
 </body>
 </html>
