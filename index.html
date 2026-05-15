@@ -3,17 +3,68 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#ffffff" />
+  <meta name="theme-color" content="#007AFF" />
   <title>YAN's SaaS</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
   <link rel="apple-touch-icon" href="icons/icon.svg" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="YAN's SaaS" />
+  <style>
+    /* 启动画面 — 内联在 head，保证比任何外部资源更早渲染。
+       配色刻意与 manifest.background_color 一致，让 iOS 原生 splash
+       和 JS splash 视觉无缝衔接。 */
+    #splash {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      background: linear-gradient(180deg, #0A84FF 0%, #0050D5 100%);
+      color: #FFFFFF;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
+      transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #splash.fade-out { opacity: 0; pointer-events: none; }
+    #splash .splash-logo {
+      width: 96px;
+      height: 96px;
+      animation: splash-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+    #splash .splash-name {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      opacity: 0;
+      animation: splash-fade-in 0.4s ease-out 0.15s forwards;
+    }
+    @keyframes splash-pop {
+      0%   { transform: scale(0.6); opacity: 0; }
+      60%  { transform: scale(1.05); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes splash-fade-in {
+      to { opacity: 1; }
+    }
+  </style>
   <link rel="stylesheet" href="themes.css" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body data-theme="white">
+  <div id="splash" aria-hidden="true">
+    <svg class="splash-logo" viewBox="0 0 1024 1024">
+      <g fill="none" stroke="#FFFFFF" stroke-width="120" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M 296 308 L 512 600"/>
+        <path d="M 728 308 L 512 600"/>
+        <path d="M 512 600 L 512 768"/>
+      </g>
+    </svg>
+    <div class="splash-name">YAN's SaaS</div>
+  </div>
   <header class="app-header">
     <div class="header-inner">
       <div class="brand">
