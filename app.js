@@ -6,6 +6,7 @@
 
   const STORAGE_KEY = 'saas-command:v1';
   const THEME_KEY = 'saas-command:theme';
+  const LAST_EMAIL_KEY = 'atlas:last-email';  // 登录时帮用户记住邮箱
   const VALID_THEMES = ['white', 'black', 'gray', 'blue', 'green', 'pink'];
 
   /** @type {{projects: Project[], ideas: Idea[]}} */
@@ -1135,6 +1136,10 @@
 
     let pendingEmail = '';
 
+    // 预填上次登录的邮箱,免得每次都要从头输
+    const rememberedEmail = localStorage.getItem(LAST_EMAIL_KEY);
+    if (rememberedEmail) authEmail.value = rememberedEmail;
+
     const setStatus = (text, kind) => {
       authStatus.hidden = !text;
       authStatus.className = `auth-status${kind ? ' ' + kind : ''}`;
@@ -1173,8 +1178,9 @@
         });
         if (error) throw error;
         pendingEmail = email;
+        localStorage.setItem(LAST_EMAIL_KEY, email);  // 下次预填
         showCodeStep(email);
-        setStatus('邮件里有 6 位数字,5 分钟内有效。', 'success');
+        setStatus('邮件里有数字登录码,5 分钟内有效。', 'success');
       } catch (err) {
         setStatus(`发送失败:${err.message || err}`, 'error');
         authSubmitEmail.disabled = false;
