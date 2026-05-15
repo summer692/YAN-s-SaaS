@@ -129,6 +129,42 @@ a:hover { text-decoration: underline; }
   padding: 48px 16px;
 }
 
+/* Swipe-to-delete wrapper --------------------------------------------- */
+.swipe-wrap {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+.swipe-wrap > .card,
+.swipe-wrap > .idea {
+  position: relative;
+  z-index: 1;
+  touch-action: pan-y;
+  will-change: transform;
+}
+.swipe-action {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 88px;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  background: #dc2626;
+  z-index: 0;
+}
+.swipe-delete {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-weight: 500;
+  font-size: 14px;
+}
+.swipe-delete:hover { background: rgba(255,255,255,0.08); }
+
 /* Project cards -------------------------------------------------------- */
 .cards {
   display: grid;

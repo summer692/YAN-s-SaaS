@@ -95,7 +95,72 @@
     filtered
       .slice()
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-      .forEach((p) => projectList.appendChild(renderProjectCard(p)));
+      .forEach((p) => projectList.appendChild(wrapSwipeable(renderProjectCard(p), () => deleteProject(p.id))));
+  }
+
+  // ---------- Swipe-to-delete (mobile) ----------
+  function wrapSwipeable(card, onDelete) {
+    const wrap = document.createElement('div');
+    wrap.className = 'swipe-wrap';
+    const action = document.createElement('div');
+    action.className = 'swipe-action';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'swipe-delete';
+    btn.textContent = '删除';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onDelete();
+    });
+    action.append(btn);
+    wrap.append(action, card);
+    attachSwipe(card);
+    return wrap;
+  }
+
+  function attachSwipe(card) {
+    let startX = 0, startY = 0, dx = 0, locked = null, revealed = false;
+    const REVEAL_WIDTH = 88;
+    const THRESHOLD = 44;
+    const setX = (x) => { card.style.transform = `translateX(${x}px)`; };
+
+    card.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      dx = 0;
+      locked = null;
+      card.style.transition = 'none';
+    }, { passive: true });
+
+    card.addEventListener('touchmove', (e) => {
+      if (e.touches.length !== 1 || locked === 'y') return;
+      const ddx = e.touches[0].clientX - startX;
+      const ddy = e.touches[0].clientY - startY;
+      if (locked === null) {
+        if (Math.abs(ddx) < 6 && Math.abs(ddy) < 6) return;
+        locked = Math.abs(ddx) > Math.abs(ddy) ? 'x' : 'y';
+        if (locked === 'y') return;
+      }
+      e.preventDefault();
+      const base = revealed ? -REVEAL_WIDTH : 0;
+      dx = clamp(base + ddx, -REVEAL_WIDTH - 30, 20);
+      setX(dx);
+    }, { passive: false });
+
+    const finish = () => {
+      if (locked !== 'x') return;
+      card.style.transition = 'transform 0.2s ease-out';
+      if (dx < -THRESHOLD) {
+        revealed = true;
+        setX(-REVEAL_WIDTH);
+      } else {
+        revealed = false;
+        setX(0);
+      }
+    };
+    card.addEventListener('touchend', finish);
+    card.addEventListener('touchcancel', finish);
   }
 
   function renderProjectCard(p) {
@@ -388,7 +453,7 @@
     filtered
       .slice()
       .sort((a, b) => b.createdAt - a.createdAt)
-      .forEach((idea) => ideaList.appendChild(renderIdeaItem(idea)));
+      .forEach((idea) => ideaList.appendChild(wrapSwipeable(renderIdeaItem(idea), () => deleteIdea(idea.id))));
   }
 
   function renderIdeaItem(idea) {
