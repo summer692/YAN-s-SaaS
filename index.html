@@ -18,8 +18,19 @@
       <nav class="tabs" role="tablist">
         <button class="tab active" data-tab="projects" role="tab">项目</button>
         <button class="tab" data-tab="ideas" role="tab">灵感</button>
+        <button class="tab" data-tab="costs" role="tab">成本</button>
+        <button class="tab" data-tab="review" role="tab">复盘</button>
       </nav>
     </div>
+    <div class="header-search">
+      <input
+        id="global-search"
+        type="search"
+        placeholder="搜索项目、灵感、备注…"
+        autocomplete="off"
+      />
+    </div>
+    <div class="renewals" id="renewals" hidden></div>
   </header>
 
   <main class="app-main">
@@ -69,6 +80,39 @@
 
       <div class="idea-list" id="idea-list"></div>
       <p class="empty-hint" id="idea-empty" hidden>还没有灵感记录，先写一条试试。</p>
+    </section>
+
+    <!-- 成本页 -->
+    <section class="view" data-view="costs">
+      <div class="metrics" id="cost-metrics"></div>
+      <div class="table-wrap">
+        <table class="cost-table" id="cost-table">
+          <thead>
+            <tr>
+              <th>项目</th>
+              <th>状态</th>
+              <th class="num">月成本</th>
+              <th class="num">月收入</th>
+              <th class="num">净值</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="empty-hint" id="cost-empty" hidden>还没有项目，先去「项目」页加一个。</p>
+    </section>
+
+    <!-- 复盘页 -->
+    <section class="view" data-view="review">
+      <div class="metrics" id="review-metrics"></div>
+      <div class="review-actions">
+        <button class="btn-primary" id="btn-ask-claude">让 Claude 复盘 →</button>
+        <button class="btn-ghost" id="btn-copy-snapshot">复制快照文本</button>
+      </div>
+      <details class="snapshot-preview">
+        <summary>查看将发给 Claude 的内容</summary>
+        <pre id="snapshot-text"></pre>
+      </details>
     </section>
   </main>
 

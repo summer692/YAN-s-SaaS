@@ -41,6 +41,21 @@
   function switchTab(name) {
     tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
     views.forEach((v) => v.classList.toggle('active', v.dataset.view === name));
+    if (name === 'costs') renderCosts();
+    if (name === 'review') renderReview();
+  }
+
+  // ---------- Search ----------
+  const searchInput = document.getElementById('global-search');
+  let searchTerm = '';
+  searchInput.addEventListener('input', () => {
+    searchTerm = searchInput.value.trim().toLowerCase();
+    renderProjects();
+    renderIdeas();
+  });
+  function matchesSearch(...fields) {
+    if (!searchTerm) return true;
+    return fields.some((f) => f && String(f).toLowerCase().includes(searchTerm));
   }
 
   // ---------- Projects ----------
@@ -60,11 +75,19 @@
   });
 
   function renderProjects() {
-    const filtered = state.projects.filter(
-      (p) => currentFilter === 'all' || p.status === currentFilter
-    );
+    const filtered = state.projects.filter((p) => {
+      const statusOk = currentFilter === 'all' || p.status === currentFilter;
+      const searchOk = matchesSearch(p.name, p.notes, p.stack, p.domain, p.registrar);
+      return statusOk && searchOk;
+    });
     projectList.innerHTML = '';
     projectEmpty.hidden = filtered.length > 0;
+    if (filtered.length === 0 && state.projects.length > 0) {
+      projectEmpty.textContent = '没有匹配的项目。';
+      projectEmpty.hidden = false;
+    } else {
+      projectEmpty.textContent = '还没有项目，点右上角「新建项目」开始记录。';
+    }
 
     // 按创建时间倒序
     filtered
@@ -181,6 +204,7 @@
     state.projects = state.projects.filter((x) => x.id !== id);
     save();
     renderProjects();
+    renderRenewals();
   }
 
   // ---------- Project modal ----------
@@ -257,6 +281,7 @@
     }
     save();
     renderProjects();
+    renderRenewals();
     closeProjectModal();
   });
 
@@ -293,9 +318,16 @@
   });
 
   function renderIdeas() {
+    const filtered = state.ideas.filter((i) => matchesSearch(i.content, i.tag));
     ideaList.innerHTML = '';
-    ideaEmpty.hidden = state.ideas.length > 0;
-    state.ideas
+    if (filtered.length === 0 && state.ideas.length > 0) {
+      ideaEmpty.textContent = '没有匹配的灵感。';
+      ideaEmpty.hidden = false;
+    } else {
+      ideaEmpty.textContent = '还没有灵感记录，先写一条试试。';
+      ideaEmpty.hidden = filtered.length > 0;
+    }
+    filtered
       .slice()
       .sort((a, b) => b.createdAt - a.createdAt)
       .forEach((idea) => ideaList.appendChild(renderIdeaItem(idea)));
@@ -367,6 +399,190 @@
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
+  // ---------- Costs ----------
+  const costMetrics = document.getElementById('cost-metrics');
+  const costTableBody = document.querySelector('#cost-table tbody');
+  const costEmpty = document.getElementById('cost-empty');
+  const costTableWrap = document.querySelector('#costs .table-wrap');
+
+  function renderCosts() {
+    const projects = state.projects;
+    const totalCost = sum(projects.map((p) => Number(p.monthlyCost) || 0));
+    const totalRev = sum(projects.map((p) => Number(p.monthlyRevenue) || 0));
+    const net = totalRev - totalCost;
+    const yearlyDomain = sum(projects.map((p) => Number(p.domainFee) || 0));
+
+    costMetrics.innerHTML = [
+      metricCard('月度总成本', `¥ ${totalCost.toFixed(2)}`),
+      metricCard('月度总收入', `¥ ${totalRev.toFixed(2)}`),
+      metricCard('月度净利', `${net >= 0 ? '+' : '-'} ¥ ${Math.abs(net).toFixed(2)}`, net >= 0 ? 'positive' : 'negative'),
+      metricCard('域名年费总和', `¥ ${yearlyDomain.toFixed(2)}`),
+    ].join('');
+
+    costEmpty.hidden = projects.length > 0;
+    costTableWrap.hidden = projects.length === 0;
+
+    costTableBody.innerHTML = projects
+      .slice()
+      .sort((a, b) => (Number(b.monthlyCost) || 0) - (Number(a.monthlyCost) || 0))
+      .map((p) => {
+        const c = Number(p.monthlyCost) || 0;
+        const r = Number(p.monthlyRevenue) || 0;
+        const n = r - c;
+        const cls = n > 0 ? 'positive' : n < 0 ? 'negative' : '';
+        return `<tr>
+          <td>${escapeHtml(p.name)}</td>
+          <td><span class="status-pill" data-status="${escapeAttr(p.status || '构思中')}">${escapeHtml(p.status || '构思中')}</span></td>
+          <td class="num">¥ ${c.toFixed(2)}</td>
+          <td class="num">¥ ${r.toFixed(2)}</td>
+          <td class="num ${cls}">${n >= 0 ? '+' : '-'} ¥ ${Math.abs(n).toFixed(2)}</td>
+        </tr>`;
+      })
+      .join('');
+  }
+
+  function metricCard(label, value, cls) {
+    return `<div class="metric">
+      <div class="metric-label">${escapeHtml(label)}</div>
+      <div class="metric-value ${cls || ''}">${escapeHtml(value)}</div>
+    </div>`;
+  }
+
+  function sum(arr) {
+    return arr.reduce((a, b) => a + b, 0);
+  }
+
+  // ---------- Review ----------
+  const reviewMetrics = document.getElementById('review-metrics');
+  const snapshotText = document.getElementById('snapshot-text');
+  const btnAskClaude = document.getElementById('btn-ask-claude');
+  const btnCopySnapshot = document.getElementById('btn-copy-snapshot');
+
+  function renderReview() {
+    const projects = state.projects;
+    const ideas = state.ideas;
+
+    const developing = projects.filter((p) => p.status === '开发中');
+    const stuck = developing.filter((p) => (Number(p.progress) || 0) < 30);
+    const almostDone = developing.filter((p) => (Number(p.progress) || 0) >= 70);
+    const highPriorityIdeas = ideas.filter((i) => i.priority === '高');
+
+    reviewMetrics.innerHTML = [
+      metricCard('开发中', String(developing.length)),
+      metricCard('可能卡住', String(stuck.length)),
+      metricCard('快完成', String(almostDone.length)),
+      metricCard('高优灵感', String(highPriorityIdeas.length)),
+    ].join('');
+
+    snapshotText.textContent = buildSnapshot();
+  }
+
+  function buildSnapshot() {
+    const projects = state.projects;
+    const ideas = state.ideas;
+    const lines = [];
+    lines.push('# 我的 SaaS 项目快照');
+    lines.push(`生成时间: ${new Date().toLocaleString('zh-CN')}`);
+    lines.push('');
+    lines.push(`## 项目（共 ${projects.length} 个）`);
+    if (projects.length === 0) lines.push('（暂无）');
+    projects.forEach((p, idx) => {
+      lines.push('');
+      lines.push(`### ${idx + 1}. ${p.name}`);
+      lines.push(`- 状态: ${p.status || '构思中'} · 完成度 ${p.progress || 0}%`);
+      if (p.domain) lines.push(`- 域名: ${p.domain}${p.domainExpiry ? ` (到期 ${p.domainExpiry})` : ''}`);
+      if (p.stack) lines.push(`- 技术栈: ${p.stack}`);
+      const c = Number(p.monthlyCost) || 0;
+      const r = Number(p.monthlyRevenue) || 0;
+      if (c || r) lines.push(`- 月度: 成本 ¥${c.toFixed(2)} / 收入 ¥${r.toFixed(2)} / 净 ¥${(r - c).toFixed(2)}`);
+      if (p.notes && p.notes.trim()) lines.push(`- 备注/下一步: ${p.notes.trim().replace(/\n+/g, ' / ')}`);
+    });
+    lines.push('');
+    lines.push(`## 灵感（共 ${ideas.length} 条）`);
+    if (ideas.length === 0) lines.push('（暂无）');
+    ideas
+      .slice()
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, 30)
+      .forEach((i) => {
+        lines.push(`- [${i.priority || '中'}·${i.tag || '其他'}] ${i.content.replace(/\n+/g, ' / ')}`);
+      });
+    lines.push('');
+    lines.push('---');
+    lines.push('请帮我做这几件事：');
+    lines.push('1. 本周复盘 — 当前重点应该放在哪个项目？');
+    lines.push('2. 6 个月成本与决策预测 — 哪些项目值得继续投入？');
+    lines.push('3. 哪些灵感值得立刻动手？');
+    return lines.join('\n');
+  }
+
+  btnAskClaude.addEventListener('click', () => {
+    const text = buildSnapshot();
+    const url = `https://claude.ai/new?q=${encodeURIComponent(text)}`;
+    window.open(url, '_blank', 'noopener');
+  });
+
+  btnCopySnapshot.addEventListener('click', async () => {
+    const text = buildSnapshot();
+    try {
+      await navigator.clipboard.writeText(text);
+      btnCopySnapshot.textContent = '已复制 ✓';
+      setTimeout(() => (btnCopySnapshot.textContent = '复制快照文本'), 1500);
+    } catch {
+      alert('复制失败，请手动选中下方文本复制。');
+    }
+  });
+
+  // ---------- Renewal alerts ----------
+  const renewalsEl = document.getElementById('renewals');
+
+  function renderRenewals() {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const items = [];
+    state.projects.forEach((p) => {
+      if (!p.domainExpiry) return;
+      const expiry = new Date(p.domainExpiry);
+      if (isNaN(expiry)) return;
+      const days = Math.floor((expiry - today) / 86400000);
+      if (days > 30) return;
+      const level = days <= 7 ? 'red' : 'yellow';
+      let detail;
+      if (days < 0) detail = `已过期 ${-days} 天`;
+      else if (days === 0) detail = '今天到期';
+      else detail = `${days} 天后到期`;
+      items.push({ project: p, days, level, detail });
+    });
+
+    if (items.length === 0) {
+      renewalsEl.hidden = true;
+      renewalsEl.innerHTML = '';
+      return;
+    }
+
+    items.sort((a, b) => a.days - b.days);
+    renewalsEl.hidden = false;
+    renewalsEl.innerHTML = items
+      .map(
+        (it) => `<div class="renewal" data-level="${it.level}" data-project-id="${escapeAttr(it.project.id)}">
+          <span class="renewal-name">${escapeHtml(it.project.name)}</span>
+          <span class="renewal-detail">${escapeHtml(it.project.domain || '域名')} · ${escapeHtml(it.detail)}${it.project.domainExpiry ? ` (${escapeHtml(it.project.domainExpiry)})` : ''}</span>
+        </div>`
+      )
+      .join('');
+
+    renewalsEl.querySelectorAll('.renewal').forEach((el) => {
+      el.addEventListener('click', () => {
+        const id = el.dataset.projectId;
+        const p = state.projects.find((x) => x.id === id);
+        if (p) {
+          switchTab('projects');
+          openProjectModal(p);
+        }
+      });
+    });
+  }
+
   // ---------- Global keys ----------
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !projectModal.hidden) {
@@ -377,4 +593,5 @@
   // ---------- Init ----------
   renderProjects();
   renderIdeas();
+  renderRenewals();
 })();
