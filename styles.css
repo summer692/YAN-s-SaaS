@@ -209,6 +209,33 @@ a:hover { text-decoration: underline; }
   padding-top: 10px;
   font-size: 13px;
 }
+.keys-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.keys-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.eye-btn {
+  background: transparent;
+  border: 0.5px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+  opacity: 0.75;
+}
+.eye-btn:hover { opacity: 1; color: var(--text-primary); }
+.eye-btn.on {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+  opacity: 1;
+}
 .keys-line {
   display: flex;
   align-items: center;
@@ -216,6 +243,7 @@ a:hover { text-decoration: underline; }
   color: var(--text-primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
+  word-break: break-all;
 }
 .keys-line + .keys-line { margin-top: 4px; }
 .keys-name { color: var(--text-secondary); }
@@ -246,6 +274,15 @@ a:hover { text-decoration: underline; }
   font-size: 12px;
 }
 .card-actions button:hover { color: var(--text-primary); }
+.card-actions .accent {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+.card-actions .accent:hover {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
 .card-actions .danger:hover { color: #991b1b; border-color: #991b1b; }
 
 /* Idea quick form ------------------------------------------------------ */

@@ -147,7 +147,7 @@
       .join('');
     if (rows.length) card.append(meta);
 
-    // API keys (masked)
+    // API keys (masked by default, eye to toggle)
     if (p.apiKeys && p.apiKeys.trim()) {
       const block = document.createElement('div');
       block.className = 'keys-block';
@@ -155,7 +155,32 @@
         .split(/\r?\n/)
         .map((l) => l.trim())
         .filter(Boolean);
-      block.innerHTML = lines.map(renderKeyLine).join('');
+      let revealed = false;
+      const header = document.createElement('div');
+      header.className = 'keys-header';
+      const label = document.createElement('span');
+      label.className = 'keys-label';
+      label.textContent = `API Keys (${lines.length})`;
+      const eye = document.createElement('button');
+      eye.type = 'button';
+      eye.className = 'eye-btn';
+      eye.title = '显示/隐藏完整密钥';
+      eye.setAttribute('aria-label', '切换密钥显示');
+      eye.textContent = '👁';
+      const body = document.createElement('div');
+      body.className = 'keys-body';
+      const render = () => {
+        body.innerHTML = lines.map((l) => renderKeyLine(l, revealed)).join('');
+        eye.classList.toggle('on', revealed);
+      };
+      eye.addEventListener('click', (e) => {
+        e.stopPropagation();
+        revealed = !revealed;
+        render();
+      });
+      render();
+      header.append(label, eye);
+      block.append(header, body);
       card.append(block);
     }
 
@@ -170,6 +195,10 @@
     // Actions
     const actions = document.createElement('div');
     actions.className = 'card-actions';
+    const askBtn = document.createElement('button');
+    askBtn.className = 'accent';
+    askBtn.textContent = '让 Claude 给建议';
+    askBtn.addEventListener('click', () => askClaudeAboutProject(p));
     const editBtn = document.createElement('button');
     editBtn.textContent = '编辑';
     editBtn.addEventListener('click', () => openProjectModal(p));
@@ -177,20 +206,47 @@
     delBtn.className = 'danger';
     delBtn.textContent = '删除';
     delBtn.addEventListener('click', () => deleteProject(p.id));
-    actions.append(editBtn, delBtn);
+    actions.append(askBtn, editBtn, delBtn);
     card.append(actions);
 
     return card;
   }
 
-  function renderKeyLine(line) {
+  function askClaudeAboutProject(p) {
+    const lines = [];
+    lines.push(`# 项目: ${p.name}`);
+    lines.push(`状态: ${p.status || '构思中'} · 完成度 ${p.progress || 0}%`);
+    if (p.domain) lines.push(`域名: ${p.domain}${p.domainExpiry ? ` (到期 ${p.domainExpiry})` : ''}`);
+    if (p.stack) lines.push(`技术栈: ${p.stack}`);
+    const c = Number(p.monthlyCost) || 0;
+    const r = Number(p.monthlyRevenue) || 0;
+    if (c || r) lines.push(`月度: 成本 ¥${c.toFixed(2)} / 收入 ¥${r.toFixed(2)} / 净 ¥${(r - c).toFixed(2)}`);
+    if (p.notes && p.notes.trim()) {
+      lines.push('');
+      lines.push('当前要做的事 / 备注:');
+      lines.push(p.notes.trim());
+    }
+    lines.push('');
+    lines.push('请基于以上信息给我几条具体可执行的建议：下一步该做什么？有没有可能被忽视的风险？');
+    const text = lines.join('\n');
+
+    if (typeof window.claude !== 'undefined' && typeof window.claude.sendPrompt === 'function') {
+      window.claude.sendPrompt(text);
+    } else {
+      const url = `https://claude.ai/new?q=${encodeURIComponent(text)}`;
+      window.open(url, '_blank', 'noopener');
+    }
+  }
+
+  function renderKeyLine(line, revealed) {
     const eq = line.indexOf('=');
     if (eq === -1) {
       return `<div class="keys-line"><span class="keys-name">${escapeHtml(line)}</span></div>`;
     }
     const name = line.slice(0, eq).trim();
     const value = line.slice(eq + 1).trim();
-    return `<div class="keys-line"><span class="keys-name">${escapeHtml(name)}=</span><span>${escapeHtml(maskKey(value))}</span></div>`;
+    const shown = revealed ? value : maskKey(value);
+    return `<div class="keys-line"><span class="keys-name">${escapeHtml(name)}=</span><span>${escapeHtml(shown)}</span></div>`;
   }
 
   function maskKey(v) {
@@ -763,4 +819,12 @@
   renderProjects();
   renderIdeas();
   renderRenewals();
+
+  // ---------- Service Worker ----------
+  // 仅在 http/https 下注册，file:// 双击场景跳过。
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    });
+  }
 })();
