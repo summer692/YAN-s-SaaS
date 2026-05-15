@@ -957,11 +957,21 @@
   }
 
   // 登录表单 ---------------------------------------------------------
+  // 两段式:邮箱 → 6 位登录码
+  // (用 OTP code 而非 magic link,因为 iOS 邮件里点链接会跳 Safari,
+  //  PWA 永远收不到 session。让用户把数字码手动输回 PWA 才能登上。)
   if (cloud) {
-    const authForm = document.getElementById('auth-form');
+    const authFormEmail = document.getElementById('auth-form-email');
+    const authFormCode = document.getElementById('auth-form-code');
     const authEmail = document.getElementById('auth-email');
+    const authCode = document.getElementById('auth-code');
+    const authSentEmail = document.getElementById('auth-sent-email');
+    const authChangeEmail = document.getElementById('auth-change-email');
     const authStatus = document.getElementById('auth-status');
-    const authSubmit = authForm.querySelector('.auth-submit');
+    const authSubmitEmail = authFormEmail.querySelector('.auth-submit');
+    const authSubmitCode = authFormCode.querySelector('.auth-submit');
+
+    let pendingEmail = '';
 
     const setStatus = (text, kind) => {
       authStatus.hidden = !text;
@@ -969,23 +979,85 @@
       authStatus.textContent = text || '';
     };
 
-    authForm.addEventListener('submit', async (e) => {
+    const showEmailStep = () => {
+      authFormEmail.hidden = false;
+      authFormCode.hidden = true;
+      authSubmitEmail.disabled = false;
+      authSubmitCode.disabled = false;
+      authCode.value = '';
+      setStatus('', null);
+    };
+    const showCodeStep = (email) => {
+      authFormEmail.hidden = true;
+      authFormCode.hidden = false;
+      authSentEmail.textContent = email;
+      setTimeout(() => authCode.focus(), 0);
+    };
+
+    // 第 1 步:发送登录码
+    authFormEmail.addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = authEmail.value.trim();
       if (!email) return;
-      authSubmit.disabled = true;
+      authSubmitEmail.disabled = true;
       setStatus('正在发送…');
       try {
         const { error } = await cloud.auth.signInWithOtp({
           email,
-          options: { emailRedirectTo: window.location.origin + window.location.pathname },
+          options: {
+            // 邮件里依然包含一个可点的 magic link (桌面浏览器场景能用),
+            // 但 iOS PWA 用户应该直接读 6 位数字回填到 App。
+            emailRedirectTo: window.location.origin + window.location.pathname,
+            shouldCreateUser: true,
+          },
         });
         if (error) throw error;
-        setStatus(`登录链接已发到 ${email},去邮箱点一下就完事。链接 1 小时内有效。`, 'success');
+        pendingEmail = email;
+        showCodeStep(email);
+        setStatus('邮件里有 6 位数字,5 分钟内有效。', 'success');
       } catch (err) {
         setStatus(`发送失败:${err.message || err}`, 'error');
-        authSubmit.disabled = false;
+        authSubmitEmail.disabled = false;
       }
+    });
+
+    // 第 2 步:用登录码换 session
+    authFormCode.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const token = authCode.value.trim();
+      if (token.length !== 6) {
+        setStatus('登录码是 6 位数字,看下邮件里那串。', 'error');
+        return;
+      }
+      authSubmitCode.disabled = true;
+      setStatus('验证中…');
+      try {
+        const { error } = await cloud.auth.verifyOtp({
+          email: pendingEmail,
+          token,
+          type: 'email',
+        });
+        if (error) throw error;
+        // 成功的话 onAuthStateChange 会立刻触发 SIGNED_IN,
+        // 那边的 showApp() 会负责切到主界面,这里不用额外做
+      } catch (err) {
+        setStatus(`验证失败:${err.message || err}。看下数字有没有打错,或者再发一次新码。`, 'error');
+        authSubmitCode.disabled = false;
+      }
+    });
+
+    // 输入满 6 位自动提交,省去用户找按钮
+    authCode.addEventListener('input', () => {
+      authCode.value = authCode.value.replace(/\D/g, '').slice(0, 6);
+      if (authCode.value.length === 6) {
+        authFormCode.requestSubmit();
+      }
+    });
+
+    // 换邮箱按钮:回到第 1 步
+    authChangeEmail.addEventListener('click', () => {
+      pendingEmail = '';
+      showEmailStep();
     });
 
     // 退出登录
@@ -993,12 +1065,11 @@
       await cloud.auth.signOut();
     });
 
-    // 监听后续登录态变化 (例如:用户从邮件链接回到 App)
+    // 监听登录态变化
     cloud.auth.onAuthStateChange((event, session) => {
       if (session) showApp();
       else {
-        authSubmit.disabled = false;
-        setStatus('', null);
+        showEmailStep();
         showAuth();
       }
     });

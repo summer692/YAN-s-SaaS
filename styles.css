@@ -124,6 +124,35 @@ button {
 }
 .auth-submit:hover { opacity: 0.92; }
 .auth-submit:disabled { opacity: 0.55; cursor: default; }
+.auth-secondary {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  border: none;
+  height: 40px;
+  font-size: 15px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  margin-top: 2px;
+}
+.auth-secondary:hover { color: #FFFFFF; }
+.auth-hint {
+  margin: 0 0 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.82);
+  text-align: left;
+}
+.auth-hint strong { color: #FFFFFF; font-weight: 600; }
+#auth-code {
+  text-align: center;
+  letter-spacing: 0.5em;
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  font-weight: 600;
+}
 .auth-status {
   margin: 18px 0 0;
   font-size: 14px;

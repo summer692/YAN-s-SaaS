@@ -79,7 +79,9 @@
       </svg>
       <h1 class="auth-title">Atlas</h1>
       <p class="auth-tagline">登录后云端同步,手机和电脑看同一份数据</p>
-      <form class="auth-form" id="auth-form" autocomplete="off">
+
+      <!-- 第 1 步:输入邮箱 -->
+      <form class="auth-form" id="auth-form-email" autocomplete="off">
         <input
           id="auth-email"
           type="email"
@@ -88,8 +90,26 @@
           required
           placeholder="你的邮箱"
         />
-        <button type="submit" class="auth-submit">发送登录链接</button>
+        <button type="submit" class="auth-submit">发送登录码</button>
       </form>
+
+      <!-- 第 2 步:输入 6 位数字登录码 -->
+      <form class="auth-form" id="auth-form-code" autocomplete="off" hidden>
+        <p class="auth-hint">登录码已发到 <strong id="auth-sent-email"></strong>,查收邮件后回到这里输入。</p>
+        <input
+          id="auth-code"
+          type="text"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          pattern="[0-9]{6}"
+          maxlength="6"
+          required
+          placeholder="6 位登录码"
+        />
+        <button type="submit" class="auth-submit">登录</button>
+        <button type="button" class="auth-secondary" id="auth-change-email">换个邮箱</button>
+      </form>
+
       <p class="auth-status" id="auth-status" hidden></p>
     </div>
   </section>
