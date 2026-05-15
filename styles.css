@@ -32,6 +32,7 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  overflow-x: hidden;
 }
 
 button { font-family: inherit; font-size: inherit; cursor: pointer; }
@@ -407,7 +408,7 @@ button {
 /* Project cards ------------------------------------------------------- */
 .cards {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--gap-2);
 }
 .card {
@@ -417,13 +418,17 @@ button {
   display: flex;
   flex-direction: column;
   gap: var(--gap-1);
+  min-width: 0;
+  max-width: 100%;
 }
 .card-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--gap-1);
+  flex-wrap: wrap;
 }
+.card-head > .card-title { flex: 1 1 auto; min-width: 0; }
 .card-title {
   margin: 0;
   font-size: 22px;
@@ -536,6 +541,7 @@ button {
 .card-actions {
   margin-top: 4px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 4px;
   border-top: 0.5px solid var(--separator);
@@ -602,6 +608,8 @@ button {
   display: flex;
   flex-direction: column;
   gap: var(--gap-1);
+  min-width: 0;
+  max-width: 100%;
 }
 .idea-content {
   white-space: pre-wrap;
@@ -848,6 +856,8 @@ button {
   position: relative;
   border-radius: var(--radius-card);
   overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
   -webkit-tap-highlight-color: transparent;
 }
 .swipe-wrap > .card,
