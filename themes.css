@@ -1,0 +1,96 @@
+/* Theme tokens. 6 套主题，data-theme 切换即可。
+ * 状态/优先级色板跨主题保持语义一致。 */
+
+:root {
+  --status-idea-bg:    #f0f0f0; --status-idea-text:    #555555;
+  --status-dev-bg:     #e5e5e5; --status-dev-text:     #111111;
+  --status-live-bg:    #dcfce7; --status-live-text:    #166534;
+  --status-pause-bg:   #fef3c7; --status-pause-text:   #92400e;
+  --status-offline-bg: #fee2e2; --status-offline-text: #991b1b;
+
+  --priority-low-bg:  #f0f0f0; --priority-low-text:  #555555;
+  --priority-mid-bg:  #e5e5e5; --priority-mid-text:  #111111;
+  --priority-high-bg: #fee2e2; --priority-high-text: #991b1b;
+}
+
+[data-theme="white"] {
+  --bg-page: #ffffff;
+  --bg-card: #fafafa;
+  --border: #ececec;
+  --text-primary: #111111;
+  --text-secondary: #555555;
+  --accent: #111111;
+  --accent-contrast: #ffffff;
+  --status-pill-bg: #f0f0f0;
+  --status-pill-text: #555555;
+}
+
+[data-theme="black"] {
+  --bg-page: #0a0a0a;
+  --bg-card: #171717;
+  --border: #262626;
+  --text-primary: #f5f5f5;
+  --text-secondary: #a3a3a3;
+  --accent: #f5f5f5;
+  --accent-contrast: #0a0a0a;
+  --status-pill-bg: #262626;
+  --status-pill-text: #a3a3a3;
+
+  --status-idea-bg:    #262626; --status-idea-text:    #a3a3a3;
+  --status-dev-bg:     #404040; --status-dev-text:     #f5f5f5;
+  --status-live-bg:    #14532d; --status-live-text:    #bbf7d0;
+  --status-pause-bg:   #78350f; --status-pause-text:   #fde68a;
+  --status-offline-bg: #7f1d1d; --status-offline-text: #fecaca;
+
+  --priority-low-bg:  #262626; --priority-low-text:  #a3a3a3;
+  --priority-mid-bg:  #404040; --priority-mid-text:  #f5f5f5;
+  --priority-high-bg: #7f1d1d; --priority-high-text: #fecaca;
+}
+
+[data-theme="gray"] {
+  --bg-page: #f4f4f5;
+  --bg-card: #ffffff;
+  --border: #e4e4e7;
+  --text-primary: #27272a;
+  --text-secondary: #52525b;
+  --accent: #52525b;
+  --accent-contrast: #ffffff;
+  --status-pill-bg: #e4e4e7;
+  --status-pill-text: #52525b;
+}
+
+[data-theme="blue"] {
+  --bg-page: #f0f7ff;
+  --bg-card: #ffffff;
+  --border: #dbeafe;
+  --text-primary: #0c4a6e;
+  --text-secondary: #1e40af;
+  --accent: #2563eb;
+  --accent-contrast: #ffffff;
+  --status-pill-bg: #dbeafe;
+  --status-pill-text: #1e40af;
+}
+
+[data-theme="green"] {
+  --bg-page: #f0fdf4;
+  --bg-card: #ffffff;
+  --border: #dcfce7;
+  --text-primary: #14532d;
+  --text-secondary: #166534;
+  --accent: #16a34a;
+  --accent-contrast: #ffffff;
+  --status-pill-bg: #dcfce7;
+  --status-pill-text: #166534;
+}
+
+[data-theme="pink"] {
+  --bg-page: #fdf2f8;
+  --bg-card: #ffffff;
+  --border: #fce7f3;
+  --text-primary: #831843;
+  --text-secondary: #be185d;
+  --accent: #ec4899;
+  --accent-contrast: #ffffff;
+  --status-pill-bg: #fce7f3;
+  --status-pill-text: #be185d;
+}
