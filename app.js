@@ -108,11 +108,11 @@
 
   async function cloudLoadAll(userId) {
     const [pRes, iRes] = await Promise.all([
-      window.supabase ? cloud.from('projects').select('*').eq('user_id', userId) : Promise.resolve({ data: [] }),
-      window.supabase ? cloud.from('ideas').select('*').eq('user_id', userId) : Promise.resolve({ data: [] }),
+      cloud.from('projects').select('*').eq('user_id', userId),
+      cloud.from('ideas').select('*').eq('user_id', userId),
     ]);
-    if (pRes.error) console.error('cloudLoadAll projects:', pRes.error);
-    if (iRes.error) console.error('cloudLoadAll ideas:', iRes.error);
+    if (pRes.error) throw new Error('加载项目失败: ' + pRes.error.message);
+    if (iRes.error) throw new Error('加载灵感失败: ' + iRes.error.message);
     return {
       projects: (pRes.data || []).map(rowToProject),
       ideas: (iRes.data || []).map(rowToIdea),
@@ -1273,48 +1273,68 @@
   }
 
   // 本地 → 云端迁移 (仅首次登录后,本地有数据 + 云端为空时触发) ----------
+  // 数据安全准则: localStorage 是数据的最后一份本地副本,
+  // **只有在上传成功** 才清掉。用户取消 / 网络出错 / RLS 失败一律保留本地。
   async function maybeMigrateLocalToCloud(userId) {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
     let local;
-    try { local = JSON.parse(raw); } catch (e) { return; }
+    try { local = JSON.parse(raw); } catch (e) {
+      localStorage.removeItem(STORAGE_KEY);  // 损坏的 JSON,删掉
+      return;
+    }
     const localProjects = Array.isArray(local.projects) ? local.projects : [];
     const localIdeas = Array.isArray(local.ideas) ? local.ideas : [];
     if (localProjects.length + localIdeas.length === 0) {
       localStorage.removeItem(STORAGE_KEY);
       return;
     }
-    // 云端已有任意数据 → 跳过迁移避免重复
+    // 云端已有数据 → 保留本地不动,下次还会提示 (避免覆盖云端)
     const cloudData = await cloudLoadAll(userId);
     if (cloudData.projects.length + cloudData.ideas.length > 0) {
-      localStorage.removeItem(STORAGE_KEY);
       return;
     }
-    const msg = `检测到这台设备的本地有 ${localProjects.length} 个项目、${localIdeas.length} 条灵感 (云端目前是空的)。\n\n上传到云端?\n\n• 确定: 上传后两台设备都能同步看到\n• 取消: 抛弃本地数据,从空白开始用云端`;
-    if (confirm(msg)) {
-      if (localProjects.length) {
-        const rows = localProjects.map((p) => projectToRow(p, userId));
-        const { error } = await cloud.from('projects').insert(rows);
-        if (error) cloudError('上传项目失败', error);
-      }
-      if (localIdeas.length) {
-        const rows = localIdeas.map((i) => ideaToRow(i, userId));
-        const { error } = await cloud.from('ideas').insert(rows);
-        if (error) cloudError('上传灵感失败', error);
+    const msg = `检测到这台设备本地有 ${localProjects.length} 个项目、${localIdeas.length} 条灵感,云端目前是空的。\n\n• 确定 → 上传到云端 (上传成功后才清本地)\n• 取消 → 保留本地不动,下次再问`;
+    if (!confirm(msg)) {
+      // 用户先放一放,localStorage 保留,下次启动还会问
+      return;
+    }
+    // 上传 — 任一项失败就保留本地,让用户截图找开发者
+    let allOk = true;
+    if (localProjects.length) {
+      const rows = localProjects.map((p) => projectToRow(p, userId));
+      const { error } = await cloud.from('projects').insert(rows);
+      if (error) {
+        cloudError('上传项目失败 (本地数据保留)', error);
+        allOk = false;
       }
     }
-    localStorage.removeItem(STORAGE_KEY);
+    if (allOk && localIdeas.length) {
+      const rows = localIdeas.map((i) => ideaToRow(i, userId));
+      const { error } = await cloud.from('ideas').insert(rows);
+      if (error) {
+        cloudError('上传灵感失败 (本地数据保留)', error);
+        allOk = false;
+      }
+    }
+    if (allOk) {
+      localStorage.removeItem(STORAGE_KEY);
+    }
   }
 
   // 进入云端模式 (首次登录 或 onAuthStateChange 触发 SIGNED_IN) ----------
   async function enterCloudMode(userId) {
     if (currentUserId === userId) return;  // 防重复触发
     currentUserId = userId;
-    await maybeMigrateLocalToCloud(userId);
-    const data = await cloudLoadAll(userId);
-    state = data;
-    setupRealtime(userId);
-    showApp();
+    try {
+      await maybeMigrateLocalToCloud(userId);
+      const data = await cloudLoadAll(userId);
+      state = data;
+      setupRealtime(userId);
+    } catch (err) {
+      cloudError('云端连接失败,显示空状态。请刷新重试', err);
+    }
+    showApp();  // 不管成功失败都展示主界面 (避免卡在 splash)
   }
   function exitCloudMode() {
     if (realtimeChannel) {
