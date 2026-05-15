@@ -1,6 +1,52 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 
+/* PWA update banner --------------------------------------------------- */
+.update-banner {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 13px;
+  animation: update-slide-in 0.3s ease-out;
+}
+.update-text { flex: 0 1 auto; }
+.update-banner .update-now {
+  background: var(--accent-contrast);
+  color: var(--accent);
+  border: none;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+}
+.update-banner .update-now:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.update-banner .update-dismiss {
+  background: transparent;
+  color: var(--accent-contrast);
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 4px;
+  opacity: 0.7;
+  cursor: pointer;
+}
+.update-banner .update-dismiss:hover { opacity: 1; }
+@keyframes update-slide-in {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
 html, body {
   margin: 0;
   padding: 0;

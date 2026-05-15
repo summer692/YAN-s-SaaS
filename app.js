@@ -872,11 +872,66 @@
   renderIdeas();
   renderRenewals();
 
-  // ---------- Service Worker ----------
-  // 仅在 http/https 下注册，file:// 双击场景跳过。
+  // ---------- Service Worker + 自动更新 ----------
+  // 流程：
+  //  1) 注册时若已有 waiting worker（上次未刷新），立即提示
+  //  2) 之后每次 updatefound，新 SW 状态变为 installed 时提示
+  //  3) 每小时主动 reg.update() 拉一次（长时间停留场景）
+  //  4) 用户点「立即刷新」→ postMessage SKIP_WAITING → controllerchange → reload
+  //  5) 用户忽略也没关系：下次冷启动新 SW 自动激活
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('service-worker.js').catch(() => {});
+      navigator.serviceWorker.register('service-worker.js')
+        .then((reg) => {
+          if (reg.waiting && navigator.serviceWorker.controller) {
+            showUpdateBanner(reg.waiting);
+          }
+          reg.addEventListener('updatefound', () => {
+            const installing = reg.installing;
+            if (!installing) return;
+            installing.addEventListener('statechange', () => {
+              if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+                showUpdateBanner(installing);
+              }
+            });
+          });
+          setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
+        })
+        .catch(() => {});
+
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return;
+        refreshing = true;
+        window.location.reload();
+      });
     });
+  }
+
+  function showUpdateBanner(waitingWorker) {
+    if (document.getElementById('update-banner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'update-banner';
+    banner.className = 'update-banner';
+    const text = document.createElement('span');
+    text.className = 'update-text';
+    text.textContent = '有新版本可用';
+    const apply = document.createElement('button');
+    apply.type = 'button';
+    apply.className = 'update-now';
+    apply.textContent = '立即刷新';
+    apply.addEventListener('click', () => {
+      apply.disabled = true;
+      apply.textContent = '正在刷新…';
+      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+    });
+    const dismiss = document.createElement('button');
+    dismiss.type = 'button';
+    dismiss.className = 'update-dismiss';
+    dismiss.setAttribute('aria-label', '稍后');
+    dismiss.textContent = '×';
+    dismiss.addEventListener('click', () => banner.remove());
+    banner.append(text, apply, dismiss);
+    document.body.prepend(banner);
   }
 })();
