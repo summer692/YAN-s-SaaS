@@ -928,6 +928,23 @@
   renderIdeas();
   renderRenewals();
 
+  // 启动画面淡出：等首屏 paint 完 + 给动画一点展示时间
+  const splash = document.getElementById('splash');
+  if (splash) {
+    const hide = () => {
+      splash.classList.add('fade-out');
+      setTimeout(() => splash.remove(), 500);
+    };
+    // 首次访问展示稍长（看清 logo 动画），后续刷新更快
+    const minShow = sessionStorage.getItem('splash-shown') ? 250 : 700;
+    sessionStorage.setItem('splash-shown', '1');
+    if (document.readyState === 'complete') {
+      setTimeout(hide, minShow);
+    } else {
+      window.addEventListener('load', () => setTimeout(hide, minShow));
+    }
+  }
+
   // ---------- Service Worker + 自动更新 ----------
   // 流程：
   //  1) 注册时若已有 waiting worker（上次未刷新），立即提示
