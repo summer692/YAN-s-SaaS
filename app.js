@@ -1025,8 +1025,8 @@
     authFormCode.addEventListener('submit', async (e) => {
       e.preventDefault();
       const token = authCode.value.trim();
-      if (token.length !== 6) {
-        setStatus('登录码是 6 位数字,看下邮件里那串。', 'error');
+      if (token.length < 6) {
+        setStatus('登录码至少 6 位数字,看下邮件里那串。', 'error');
         return;
       }
       authSubmitCode.disabled = true;
@@ -1046,10 +1046,11 @@
       }
     });
 
-    // 输入满 6 位自动提交,省去用户找按钮
+    // Supabase OTP 长度可配置 (默认 6,本项目实际是 8)。
+    // 接受 6/8 两种最常见长度;到了这两个边界自动提交,免一次手动点。
     authCode.addEventListener('input', () => {
-      authCode.value = authCode.value.replace(/\D/g, '').slice(0, 6);
-      if (authCode.value.length === 6) {
+      authCode.value = authCode.value.replace(/\D/g, '').slice(0, 10);
+      if (authCode.value.length === 6 || authCode.value.length === 8) {
         authFormCode.requestSubmit();
       }
     });
