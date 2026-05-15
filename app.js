@@ -1170,13 +1170,21 @@
         const { error } = await cloud.auth.signInWithOtp({
           email,
           options: {
-            // 邮件里依然包含一个可点的 magic link (桌面浏览器场景能用),
-            // 但 iOS PWA 用户应该直接读 6 位数字回填到 App。
             emailRedirectTo: window.location.origin + window.location.pathname,
-            shouldCreateUser: true,
+            // 关键: 禁止用没注册过的邮箱登录,防止打错字自动建新账号
+            // (个人 App 场景,新账号只在 Supabase 后台手动添加)
+            shouldCreateUser: false,
           },
         });
-        if (error) throw error;
+        if (error) {
+          // Supabase 在 shouldCreateUser=false 且邮箱未注册时,
+          // 错误信息可能是 'Signups not allowed' 或 'User not found' 之类
+          const msg = (error.message || '').toLowerCase();
+          if (msg.includes('signups not allowed') || msg.includes('not found') || msg.includes('not allowed')) {
+            throw new Error(`找不到 ${email} 这个账号。检查拼写,或者去 Supabase 后台手动添加新用户。`);
+          }
+          throw error;
+        }
         pendingEmail = email;
         localStorage.setItem(LAST_EMAIL_KEY, email);  // 下次预填
         showCodeStep(email);
