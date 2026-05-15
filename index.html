@@ -21,6 +21,31 @@
         <button class="tab" data-tab="costs" role="tab">成本</button>
         <button class="tab" data-tab="review" role="tab">复盘</button>
       </nav>
+      <div class="header-tools">
+        <div class="theme-picker" id="theme-picker">
+          <button class="icon-btn" id="theme-toggle" title="切换主题" aria-label="切换主题">
+            <span class="theme-swatch" data-current></span>
+          </button>
+          <div class="theme-menu" id="theme-menu" hidden>
+            <button class="theme-option" data-theme="white"><span class="theme-swatch" data-theme="white"></span>白色</button>
+            <button class="theme-option" data-theme="black"><span class="theme-swatch" data-theme="black"></span>黑色</button>
+            <button class="theme-option" data-theme="gray"><span class="theme-swatch" data-theme="gray"></span>灰色</button>
+            <button class="theme-option" data-theme="blue"><span class="theme-swatch" data-theme="blue"></span>蓝色</button>
+            <button class="theme-option" data-theme="green"><span class="theme-swatch" data-theme="green"></span>绿色</button>
+            <button class="theme-option" data-theme="pink"><span class="theme-swatch" data-theme="pink"></span>粉色</button>
+          </div>
+        </div>
+        <div class="settings" id="settings">
+          <button class="icon-btn" id="settings-toggle" title="设置" aria-label="设置">⋯</button>
+          <div class="settings-menu" id="settings-menu" hidden>
+            <button data-action="export">导出 JSON</button>
+            <button data-action="import">导入 JSON</button>
+            <button data-action="clear" class="danger-text">全部清空</button>
+            <div class="settings-hint">快捷键: N 新建 · I 灵感 · / 搜索 · 1-4 切页</div>
+          </div>
+        </div>
+        <input type="file" id="import-file" accept="application/json,.json" hidden />
+      </div>
     </div>
     <div class="header-search">
       <input

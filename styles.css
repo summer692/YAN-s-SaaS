@@ -408,6 +408,80 @@ a:hover { text-decoration: underline; }
   padding-top: 6px;
 }
 
+/* Header tools (theme picker + settings) ------------------------------ */
+.header-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.theme-picker,
+.settings {
+  position: relative;
+}
+.theme-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 0.5px solid var(--border);
+  vertical-align: middle;
+}
+.theme-swatch[data-current] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.theme-swatch[data-theme="white"] { background: #ffffff; border-color: #ececec; }
+.theme-swatch[data-theme="black"] { background: #0a0a0a; border-color: #262626; }
+.theme-swatch[data-theme="gray"]  { background: #52525b; border-color: #52525b; }
+.theme-swatch[data-theme="blue"]  { background: #2563eb; border-color: #2563eb; }
+.theme-swatch[data-theme="green"] { background: #16a34a; border-color: #16a34a; }
+.theme-swatch[data-theme="pink"]  { background: #ec4899; border-color: #ec4899; }
+
+.theme-menu,
+.settings-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--bg-page);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  min-width: 160px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.theme-option,
+.settings-menu button {
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.theme-option:hover,
+.settings-menu button:hover {
+  background: var(--bg-card);
+}
+.theme-option.active {
+  background: var(--bg-card);
+}
+.settings-menu .danger-text { color: #991b1b; }
+.settings-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 6px 10px 4px;
+  border-top: 0.5px solid var(--border);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
 /* Header search + renewals -------------------------------------------- */
 .header-search {
   max-width: 960px;

@@ -5,6 +5,8 @@
   'use strict';
 
   const STORAGE_KEY = 'saas-command:v1';
+  const THEME_KEY = 'saas-command:theme';
+  const VALID_THEMES = ['white', 'black', 'gray', 'blue', 'green', 'pink'];
 
   /** @type {{projects: Project[], ideas: Idea[]}} */
   let state = load();
@@ -583,10 +585,177 @@
     });
   }
 
+  // ---------- Theme ----------
+  const themeToggle = document.getElementById('theme-toggle');
+  const themeMenu = document.getElementById('theme-menu');
+
+  function applyTheme(name) {
+    const theme = VALID_THEMES.includes(name) ? name : 'white';
+    document.body.dataset.theme = theme;
+    localStorage.setItem(THEME_KEY, theme);
+    themeMenu.querySelectorAll('.theme-option').forEach((b) =>
+      b.classList.toggle('active', b.dataset.theme === theme)
+    );
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+      const bg = getComputedStyle(document.body).getPropertyValue('--bg-page').trim();
+      if (bg) metaTheme.setAttribute('content', bg);
+    }
+  }
+
+  themeToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    themeMenu.hidden = !themeMenu.hidden;
+    settingsMenu.hidden = true;
+  });
+  themeMenu.addEventListener('click', (e) => {
+    const btn = e.target.closest('.theme-option');
+    if (!btn) return;
+    applyTheme(btn.dataset.theme);
+    themeMenu.hidden = true;
+  });
+
+  applyTheme(localStorage.getItem(THEME_KEY) || 'white');
+
+  // ---------- Settings menu (export / import / clear) ----------
+  const settingsToggle = document.getElementById('settings-toggle');
+  const settingsMenu = document.getElementById('settings-menu');
+  const importFile = document.getElementById('import-file');
+
+  settingsToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    settingsMenu.hidden = !settingsMenu.hidden;
+    themeMenu.hidden = true;
+  });
+
+  settingsMenu.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    settingsMenu.hidden = true;
+    if (btn.dataset.action === 'export') exportData();
+    if (btn.dataset.action === 'import') importFile.click();
+    if (btn.dataset.action === 'clear') clearAll();
+  });
+
+  importFile.addEventListener('change', async () => {
+    const file = importFile.files && importFile.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== 'object') throw new Error('格式不对');
+      const projects = Array.isArray(parsed.projects) ? parsed.projects : [];
+      const ideas = Array.isArray(parsed.ideas) ? parsed.ideas : [];
+      const mode = confirm(
+        `发现 ${projects.length} 个项目、${ideas.length} 条灵感。\n\n确定 = 合并到现有数据\n取消 = 完全覆盖`
+      );
+      if (mode) {
+        state.projects = mergeById(state.projects, projects);
+        state.ideas = mergeById(state.ideas, ideas);
+      } else {
+        if (!confirm('确认用导入的数据覆盖当前所有数据？此操作不可恢复。')) {
+          importFile.value = '';
+          return;
+        }
+        state.projects = projects;
+        state.ideas = ideas;
+      }
+      save();
+      renderProjects();
+      renderIdeas();
+      renderRenewals();
+      alert('导入成功。');
+    } catch (err) {
+      alert(`导入失败：${err.message || err}`);
+    } finally {
+      importFile.value = '';
+    }
+  });
+
+  function mergeById(existing, incoming) {
+    const map = new Map(existing.map((x) => [x.id, x]));
+    incoming.forEach((x) => {
+      if (x && x.id) map.set(x.id, x);
+    });
+    return Array.from(map.values());
+  }
+
+  function exportData() {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    a.href = url;
+    a.download = `saas-command-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function clearAll() {
+    if (!confirm('确定清空所有项目和灵感？此操作不可恢复。建议先「导出 JSON」备份。')) return;
+    if (!confirm('再次确认：真的全部清空？')) return;
+    state.projects = [];
+    state.ideas = [];
+    save();
+    renderProjects();
+    renderIdeas();
+    renderRenewals();
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#theme-picker')) themeMenu.hidden = true;
+    if (!e.target.closest('#settings')) settingsMenu.hidden = true;
+  });
+
   // ---------- Global keys ----------
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !projectModal.hidden) {
-      closeProjectModal();
+    if (e.key === 'Escape') {
+      if (!projectModal.hidden) closeProjectModal();
+      themeMenu.hidden = true;
+      settingsMenu.hidden = true;
+      return;
+    }
+
+    // 输入框内不触发字母快捷键
+    const active = document.activeElement;
+    const inField =
+      active &&
+      (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable);
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+    if (e.key === '/') {
+      if (inField) return;
+      e.preventDefault();
+      searchInput.focus();
+      searchInput.select();
+      return;
+    }
+
+    if (inField) return;
+
+    if (e.key === 'n' || e.key === 'N') {
+      e.preventDefault();
+      switchTab('projects');
+      openProjectModal(null);
+    } else if (e.key === 'i' || e.key === 'I') {
+      e.preventDefault();
+      switchTab('ideas');
+      ideaInput.focus();
+    } else if (e.key === '1') {
+      e.preventDefault();
+      switchTab('projects');
+    } else if (e.key === '2') {
+      e.preventDefault();
+      switchTab('ideas');
+    } else if (e.key === '3') {
+      e.preventDefault();
+      switchTab('costs');
+    } else if (e.key === '4') {
+      e.preventDefault();
+      switchTab('review');
     }
   });
 
