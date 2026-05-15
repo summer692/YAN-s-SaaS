@@ -1,96 +1,174 @@
-/* Theme tokens. 6 套主题，data-theme 切换即可。
- * 状态/优先级色板跨主题保持语义一致。 */
-
-:root {
-  --status-idea-bg:    #f0f0f0; --status-idea-text:    #555555;
-  --status-dev-bg:     #e5e5e5; --status-dev-text:     #111111;
-  --status-live-bg:    #dcfce7; --status-live-text:    #166534;
-  --status-pause-bg:   #fef3c7; --status-pause-text:   #92400e;
-  --status-offline-bg: #fee2e2; --status-offline-text: #991b1b;
-
-  --priority-low-bg:  #f0f0f0; --priority-low-text:  #555555;
-  --priority-mid-bg:  #e5e5e5; --priority-mid-text:  #111111;
-  --priority-high-bg: #fee2e2; --priority-high-text: #991b1b;
-}
+/* YAN's SaaS — 主题 tokens
+ * 严格按 Apple HIG 系统色：
+ *   - iOS Light 用 systemGrouped 背景 #F2F2F7 + 白卡片
+ *   - iOS Dark 用 #000 + #1C1C1E 卡片
+ *   - 强调色按主题切换为对应 systemColor
+ * 透明度变量用 rgba 而非 color-mix 以兼容老 iOS Safari */
 
 [data-theme="white"] {
-  --bg-page: #ffffff;
-  --bg-card: #fafafa;
-  --border: #ececec;
-  --text-primary: #111111;
-  --text-secondary: #555555;
-  --accent: #111111;
-  --accent-contrast: #ffffff;
-  --status-pill-bg: #f0f0f0;
-  --status-pill-text: #555555;
+  --bg-page: #F2F2F7;
+  --bg-card: #FFFFFF;
+  --bg-elevated: #FFFFFF;
+  --bg-input: rgba(120, 120, 128, 0.12);
+  --bg-input-focus: #FFFFFF;
+  --border: #C6C6C8;
+  --separator: rgba(60, 60, 67, 0.29);
+  --text-primary: #000000;
+  --text-secondary: rgba(60, 60, 67, 0.6);
+  --text-tertiary: rgba(60, 60, 67, 0.3);
+  --accent: #007AFF;
+  --accent-contrast: #FFFFFF;
+  --status-pill-bg: rgba(120, 120, 128, 0.16);
+  --status-pill-text: rgba(60, 60, 67, 0.6);
+  --header-blur-bg: rgba(242, 242, 247, 0.72);
+
+  --status-idea-bg:    rgba(120, 120, 128, 0.16); --status-idea-text:    rgba(60, 60, 67, 0.6);
+  --status-dev-bg:     rgba(0, 122, 255, 0.14);   --status-dev-text:     #0040DD;
+  --status-live-bg:    rgba(52, 199, 89, 0.16);   --status-live-text:    #1A7F37;
+  --status-pause-bg:   rgba(255, 149, 0, 0.18);   --status-pause-text:   #B25000;
+  --status-offline-bg: rgba(255, 59, 48, 0.14);   --status-offline-text: #C70F0F;
+
+  --priority-low-bg:  rgba(120, 120, 128, 0.16); --priority-low-text:  rgba(60, 60, 67, 0.6);
+  --priority-mid-bg:  rgba(0, 122, 255, 0.14);   --priority-mid-text:  #0040DD;
+  --priority-high-bg: rgba(255, 59, 48, 0.14);   --priority-high-text: #C70F0F;
 }
 
 [data-theme="black"] {
-  --bg-page: #0a0a0a;
-  --bg-card: #171717;
-  --border: #262626;
-  --text-primary: #f5f5f5;
-  --text-secondary: #a3a3a3;
-  --accent: #f5f5f5;
-  --accent-contrast: #0a0a0a;
-  --status-pill-bg: #262626;
-  --status-pill-text: #a3a3a3;
+  --bg-page: #000000;
+  --bg-card: #1C1C1E;
+  --bg-elevated: #2C2C2E;
+  --bg-input: #1C1C1E;
+  --bg-input-focus: #2C2C2E;
+  --border: #38383A;
+  --separator: rgba(84, 84, 88, 0.65);
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(235, 235, 245, 0.6);
+  --text-tertiary: rgba(235, 235, 245, 0.3);
+  --accent: #0A84FF;
+  --accent-contrast: #FFFFFF;
+  --status-pill-bg: rgba(120, 120, 128, 0.24);
+  --status-pill-text: rgba(235, 235, 245, 0.6);
+  --header-blur-bg: rgba(0, 0, 0, 0.72);
 
-  --status-idea-bg:    #262626; --status-idea-text:    #a3a3a3;
-  --status-dev-bg:     #404040; --status-dev-text:     #f5f5f5;
-  --status-live-bg:    #14532d; --status-live-text:    #bbf7d0;
-  --status-pause-bg:   #78350f; --status-pause-text:   #fde68a;
-  --status-offline-bg: #7f1d1d; --status-offline-text: #fecaca;
+  --status-idea-bg:    rgba(120, 120, 128, 0.24); --status-idea-text:    rgba(235, 235, 245, 0.6);
+  --status-dev-bg:     rgba(10, 132, 255, 0.22);  --status-dev-text:     #5EAEFF;
+  --status-live-bg:    rgba(48, 209, 88, 0.22);   --status-live-text:    #6BE079;
+  --status-pause-bg:   rgba(255, 159, 10, 0.22);  --status-pause-text:   #FFB340;
+  --status-offline-bg: rgba(255, 69, 58, 0.22);   --status-offline-text: #FF6961;
 
-  --priority-low-bg:  #262626; --priority-low-text:  #a3a3a3;
-  --priority-mid-bg:  #404040; --priority-mid-text:  #f5f5f5;
-  --priority-high-bg: #7f1d1d; --priority-high-text: #fecaca;
+  --priority-low-bg:  rgba(120, 120, 128, 0.24); --priority-low-text:  rgba(235, 235, 245, 0.6);
+  --priority-mid-bg:  rgba(10, 132, 255, 0.22);  --priority-mid-text:  #5EAEFF;
+  --priority-high-bg: rgba(255, 69, 58, 0.22);   --priority-high-text: #FF6961;
 }
 
 [data-theme="gray"] {
-  --bg-page: #f4f4f5;
-  --bg-card: #ffffff;
-  --border: #e4e4e7;
-  --text-primary: #27272a;
-  --text-secondary: #52525b;
-  --accent: #52525b;
-  --accent-contrast: #ffffff;
-  --status-pill-bg: #e4e4e7;
-  --status-pill-text: #52525b;
+  --bg-page: #F2F2F7;
+  --bg-card: #FFFFFF;
+  --bg-elevated: #FFFFFF;
+  --bg-input: rgba(120, 120, 128, 0.12);
+  --bg-input-focus: #FFFFFF;
+  --border: #C6C6C8;
+  --separator: rgba(60, 60, 67, 0.29);
+  --text-primary: #000000;
+  --text-secondary: rgba(60, 60, 67, 0.6);
+  --text-tertiary: rgba(60, 60, 67, 0.3);
+  --accent: #8E8E93;
+  --accent-contrast: #FFFFFF;
+  --status-pill-bg: rgba(120, 120, 128, 0.16);
+  --status-pill-text: rgba(60, 60, 67, 0.6);
+  --header-blur-bg: rgba(242, 242, 247, 0.72);
+
+  --status-idea-bg:    rgba(120, 120, 128, 0.16); --status-idea-text:    rgba(60, 60, 67, 0.6);
+  --status-dev-bg:     rgba(120, 120, 128, 0.24); --status-dev-text:     #000000;
+  --status-live-bg:    rgba(52, 199, 89, 0.16);   --status-live-text:    #1A7F37;
+  --status-pause-bg:   rgba(255, 149, 0, 0.18);   --status-pause-text:   #B25000;
+  --status-offline-bg: rgba(255, 59, 48, 0.14);   --status-offline-text: #C70F0F;
+
+  --priority-low-bg:  rgba(120, 120, 128, 0.16); --priority-low-text:  rgba(60, 60, 67, 0.6);
+  --priority-mid-bg:  rgba(120, 120, 128, 0.24); --priority-mid-text:  #000000;
+  --priority-high-bg: rgba(255, 59, 48, 0.14);   --priority-high-text: #C70F0F;
 }
 
 [data-theme="blue"] {
-  --bg-page: #f0f7ff;
-  --bg-card: #ffffff;
-  --border: #dbeafe;
-  --text-primary: #0c4a6e;
-  --text-secondary: #1e40af;
-  --accent: #2563eb;
-  --accent-contrast: #ffffff;
-  --status-pill-bg: #dbeafe;
-  --status-pill-text: #1e40af;
+  --bg-page: #EFF6FF;
+  --bg-card: #FFFFFF;
+  --bg-elevated: #FFFFFF;
+  --bg-input: rgba(0, 122, 255, 0.08);
+  --bg-input-focus: #FFFFFF;
+  --border: #C6D6E8;
+  --separator: rgba(60, 60, 67, 0.29);
+  --text-primary: #000000;
+  --text-secondary: rgba(60, 60, 67, 0.6);
+  --text-tertiary: rgba(60, 60, 67, 0.3);
+  --accent: #007AFF;
+  --accent-contrast: #FFFFFF;
+  --status-pill-bg: rgba(0, 122, 255, 0.12);
+  --status-pill-text: #0040DD;
+  --header-blur-bg: rgba(239, 246, 255, 0.72);
+
+  --status-idea-bg:    rgba(120, 120, 128, 0.16); --status-idea-text:    rgba(60, 60, 67, 0.6);
+  --status-dev-bg:     rgba(0, 122, 255, 0.14);   --status-dev-text:     #0040DD;
+  --status-live-bg:    rgba(52, 199, 89, 0.16);   --status-live-text:    #1A7F37;
+  --status-pause-bg:   rgba(255, 149, 0, 0.18);   --status-pause-text:   #B25000;
+  --status-offline-bg: rgba(255, 59, 48, 0.14);   --status-offline-text: #C70F0F;
+
+  --priority-low-bg:  rgba(120, 120, 128, 0.16); --priority-low-text:  rgba(60, 60, 67, 0.6);
+  --priority-mid-bg:  rgba(0, 122, 255, 0.14);   --priority-mid-text:  #0040DD;
+  --priority-high-bg: rgba(255, 59, 48, 0.14);   --priority-high-text: #C70F0F;
 }
 
 [data-theme="green"] {
-  --bg-page: #f0fdf4;
-  --bg-card: #ffffff;
-  --border: #dcfce7;
-  --text-primary: #14532d;
-  --text-secondary: #166534;
-  --accent: #16a34a;
-  --accent-contrast: #ffffff;
-  --status-pill-bg: #dcfce7;
-  --status-pill-text: #166534;
+  --bg-page: #F0FAF4;
+  --bg-card: #FFFFFF;
+  --bg-elevated: #FFFFFF;
+  --bg-input: rgba(52, 199, 89, 0.10);
+  --bg-input-focus: #FFFFFF;
+  --border: #C8E6D2;
+  --separator: rgba(60, 60, 67, 0.29);
+  --text-primary: #000000;
+  --text-secondary: rgba(60, 60, 67, 0.6);
+  --text-tertiary: rgba(60, 60, 67, 0.3);
+  --accent: #34C759;
+  --accent-contrast: #FFFFFF;
+  --status-pill-bg: rgba(52, 199, 89, 0.14);
+  --status-pill-text: #1A7F37;
+  --header-blur-bg: rgba(240, 250, 244, 0.72);
+
+  --status-idea-bg:    rgba(120, 120, 128, 0.16); --status-idea-text:    rgba(60, 60, 67, 0.6);
+  --status-dev-bg:     rgba(52, 199, 89, 0.14);   --status-dev-text:     #1A7F37;
+  --status-live-bg:    rgba(52, 199, 89, 0.20);   --status-live-text:    #14552A;
+  --status-pause-bg:   rgba(255, 149, 0, 0.18);   --status-pause-text:   #B25000;
+  --status-offline-bg: rgba(255, 59, 48, 0.14);   --status-offline-text: #C70F0F;
+
+  --priority-low-bg:  rgba(120, 120, 128, 0.16); --priority-low-text:  rgba(60, 60, 67, 0.6);
+  --priority-mid-bg:  rgba(52, 199, 89, 0.14);   --priority-mid-text:  #1A7F37;
+  --priority-high-bg: rgba(255, 59, 48, 0.14);   --priority-high-text: #C70F0F;
 }
 
 [data-theme="pink"] {
-  --bg-page: #fdf2f8;
-  --bg-card: #ffffff;
-  --border: #fce7f3;
-  --text-primary: #831843;
-  --text-secondary: #be185d;
-  --accent: #ec4899;
-  --accent-contrast: #ffffff;
-  --status-pill-bg: #fce7f3;
-  --status-pill-text: #be185d;
+  --bg-page: #FDF2F8;
+  --bg-card: #FFFFFF;
+  --bg-elevated: #FFFFFF;
+  --bg-input: rgba(255, 45, 85, 0.08);
+  --bg-input-focus: #FFFFFF;
+  --border: #EFD0DE;
+  --separator: rgba(60, 60, 67, 0.29);
+  --text-primary: #000000;
+  --text-secondary: rgba(60, 60, 67, 0.6);
+  --text-tertiary: rgba(60, 60, 67, 0.3);
+  --accent: #FF2D55;
+  --accent-contrast: #FFFFFF;
+  --status-pill-bg: rgba(255, 45, 85, 0.10);
+  --status-pill-text: #B0103A;
+  --header-blur-bg: rgba(253, 242, 248, 0.72);
+
+  --status-idea-bg:    rgba(120, 120, 128, 0.16); --status-idea-text:    rgba(60, 60, 67, 0.6);
+  --status-dev-bg:     rgba(255, 45, 85, 0.12);   --status-dev-text:     #B0103A;
+  --status-live-bg:    rgba(52, 199, 89, 0.16);   --status-live-text:    #1A7F37;
+  --status-pause-bg:   rgba(255, 149, 0, 0.18);   --status-pause-text:   #B25000;
+  --status-offline-bg: rgba(255, 59, 48, 0.14);   --status-offline-text: #C70F0F;
+
+  --priority-low-bg:  rgba(120, 120, 128, 0.16); --priority-low-text:  rgba(60, 60, 67, 0.6);
+  --priority-mid-bg:  rgba(255, 45, 85, 0.12);   --priority-mid-text:  #B0103A;
+  --priority-high-bg: rgba(255, 59, 48, 0.14);   --priority-high-text: #C70F0F;
 }
