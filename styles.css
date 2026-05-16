@@ -467,6 +467,64 @@ button {
 }
 .menu-item:hover { background: var(--bg-input); }
 .menu-item.danger-text { color: #FF3B30; }
+.menu-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--status-pill-bg);
+  color: var(--text-secondary);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.menu-badge:empty { display: none; }
+
+/* 废纸篓 ----------------------------------------------------------- */
+.trash-section { margin-bottom: var(--gap-2); }
+.trash-section:last-of-type { margin-bottom: 0; }
+.trash-section-title {
+  margin: 0 0 var(--gap-1);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.trash-list { display: flex; flex-direction: column; gap: 6px; }
+.trash-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-1);
+  background: var(--bg-card);
+  border-radius: var(--radius-card);
+  padding: 10px 14px;
+}
+.trash-info { flex: 1 1 auto; min-width: 0; }
+.trash-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.trash-meta {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+.trash-restore {
+  background: transparent;
+  color: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.trash-restore:hover { background: var(--bg-input); }
 
 /* Main + views -------------------------------------------------------- */
 .app-main {
