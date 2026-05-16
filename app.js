@@ -45,6 +45,161 @@
   // 未登录或没接云端时为 null,所有 persist/remove 自动降级到 localStorage。
   let currentUserId = null;
 
+  // ---------- API Key 客户端加密 (Phase 3) ----------
+  // 用 PIN(6 位数字) + 随机 salt 通过 PBKDF2 派生 256-bit AES-GCM 密钥。
+  // 加密后的密文以 'atlas:v1:' 开头存到 projects.api_keys_cipher。
+  // 没有这个前缀的视为「旧的明文」,保持原样直到下次写入时被加密。
+  // derivedKey 只活在 JS 内存里 (单次 session),退出 / 刷新就要重新输 PIN。
+  const ENC_PREFIX = 'atlas:v1:';
+  let derivedKey = null;          // CryptoKey,解锁后才有值
+  let encSettings = null;         // { user_id, enc_salt, enc_check_cipher }
+
+  function bytesToBase64(bytes) {
+    let s = '';
+    for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s);
+  }
+  function base64ToBytes(b64) {
+    const s = atob(b64);
+    const out = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+    return out;
+  }
+  function isEncrypted(text) {
+    return typeof text === 'string' && text.startsWith(ENC_PREFIX);
+  }
+  async function deriveKeyFromPin(pin, saltB64) {
+    const saltBytes = base64ToBytes(saltB64);
+    const baseKey = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(pin),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: saltBytes, iterations: 200000, hash: 'SHA-256' },
+      baseKey,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  }
+  async function encryptWithKey(key, plaintext) {
+    if (!plaintext) return '';
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      new TextEncoder().encode(plaintext)
+    );
+    const blob = new Uint8Array(iv.length + ct.byteLength);
+    blob.set(iv, 0);
+    blob.set(new Uint8Array(ct), iv.length);
+    return ENC_PREFIX + bytesToBase64(blob);
+  }
+  async function decryptWithKey(key, ciphertext) {
+    if (!ciphertext) return '';
+    if (!isEncrypted(ciphertext)) return ciphertext;  // 旧的明文,原样返回
+    const blob = base64ToBytes(ciphertext.slice(ENC_PREFIX.length));
+    const iv = blob.slice(0, 12);
+    const ct = blob.slice(12);
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+    return new TextDecoder().decode(pt);
+  }
+
+  async function loadUserSettings(userId) {
+    const { data, error } = await cloud
+      .from('user_settings')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) { console.error('loadUserSettings:', error); return null; }
+    return data;
+  }
+  async function saveUserSettings(userId, patch) {
+    const { error } = await cloud
+      .from('user_settings')
+      .upsert({ user_id: userId, ...patch });
+    if (error) cloudError('保存设置失败', error);
+  }
+
+  // 用 derivedKey 把 state 里所有加密的 apiKeys 字段解到内存中的明文形式
+  async function decryptAllProjectsInPlace() {
+    if (!derivedKey) return;
+    for (const p of state.projects) {
+      if (isEncrypted(p.apiKeys)) {
+        try {
+          p.apiKeys = await decryptWithKey(derivedKey, p.apiKeys);
+        } catch (err) {
+          console.error('decrypt failed for', p.id, err);
+        }
+      }
+    }
+  }
+
+  // 首次设置 PIN
+  async function setupPin() {
+    if (!currentUserId) { alert('请先登录'); return; }
+    if (encSettings && encSettings.enc_salt) {
+      alert('已经设过 PIN 了。如果想换,选「修改 PIN」。');
+      return;
+    }
+    const pin1 = prompt(
+      '设置 6 位数字 PIN\n\n这个 PIN 用来加密 API Keys,云端只存密文。\n' +
+      '⚠️ 忘记 PIN = 永远读不回 API Keys。请记牢。'
+    );
+    if (pin1 === null) return;
+    if (!/^\d{6}$/.test(pin1)) { alert('PIN 必须正好 6 位数字'); return; }
+    const pin2 = prompt('再输一次确认:');
+    if (pin2 === null) return;
+    if (pin1 !== pin2) { alert('两次不一致,取消'); return; }
+
+    // 生成随机 salt + 派生 key + 加密校验串
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const saltB64 = bytesToBase64(salt);
+    const key = await deriveKeyFromPin(pin1, saltB64);
+    const checkCipher = await encryptWithKey(key, 'ATLAS-PIN-OK');
+    await saveUserSettings(currentUserId, {
+      enc_salt: saltB64,
+      enc_check_cipher: checkCipher,
+    });
+    encSettings = { user_id: currentUserId, enc_salt: saltB64, enc_check_cipher: checkCipher };
+    derivedKey = key;
+
+    // 把现有所有明文 API Key 一次性加密上云
+    const toReencrypt = state.projects.filter((p) => p.apiKeys && !isEncrypted(p.apiKeys));
+    for (const p of toReencrypt) {
+      const cipher = await encryptWithKey(key, p.apiKeys);
+      const { error } = await cloud.from('projects').update({ api_keys_cipher: cipher }).eq('id', p.id);
+      if (error) cloudError('加密上传失败 ' + p.name, error);
+      // state 仍保留明文 (用户在本 session 中能看)
+    }
+    alert(`PIN 设置完成。已加密 ${toReencrypt.length} 个项目的 API Keys。`);
+    showApp();  // 刷新菜单状态 (隐藏「设置 PIN」入口) + 重渲染卡片
+  }
+
+  // 解锁 (已设过 PIN,本 session 还没解)
+  async function unlockPin() {
+    if (!encSettings || !encSettings.enc_salt) {
+      alert('还没设置 PIN,先去 ⋯ 菜单设置。');
+      return;
+    }
+    const pin = prompt('输入 PIN 解锁 API Keys:');
+    if (pin === null) return;
+    if (!/^\d{6}$/.test(pin)) { alert('PIN 是 6 位数字'); return; }
+    try {
+      const key = await deriveKeyFromPin(pin, encSettings.enc_salt);
+      const decrypted = await decryptWithKey(key, encSettings.enc_check_cipher);
+      if (decrypted !== 'ATLAS-PIN-OK') throw new Error('mismatch');
+      derivedKey = key;
+      await decryptAllProjectsInPlace();
+      showApp();  // 刷新菜单状态 (隐藏「解锁」入口) + 重渲染卡片
+    } catch (err) {
+      alert('PIN 不对,再试。');
+    }
+  }
+
   function projectToRow(p, userId) {
     return {
       id: UUID_RE.test(p.id) ? p.id : undefined,
@@ -128,9 +283,18 @@
   async function persistProject(p) {
     if (!currentUserId) { save(); return; }
     const row = projectToRow(p, currentUserId);
+    // 加密 API Keys (如果 PIN 已设且已解锁,且当前还是明文)
+    if (derivedKey && row.api_keys_cipher && !isEncrypted(row.api_keys_cipher)) {
+      row.api_keys_cipher = await encryptWithKey(derivedKey, row.api_keys_cipher);
+    }
     const { data, error } = await cloud.from('projects').upsert(row).select().single();
     if (error) { cloudError('保存项目失败', error); return; }
     const updated = rowToProject(data);
+    // 如果云端返回的是密文,且本地解锁着,解回内存的明文形式给 UI 用
+    if (derivedKey && isEncrypted(updated.apiKeys)) {
+      try { updated.apiKeys = await decryptWithKey(derivedKey, updated.apiKeys); }
+      catch (e) { console.error('decrypt after save failed', e); }
+    }
     const idx = state.projects.findIndex((x) => x.id === p.id || x.id === updated.id);
     if (idx >= 0) state.projects[idx] = updated;
     else state.projects.push(updated);
@@ -340,6 +504,21 @@
     if (p.apiKeys && p.apiKeys.trim()) {
       const block = document.createElement('div');
       block.className = 'keys-block';
+      // 如果是密文且没解锁,显示锁定状态而非内容
+      if (isEncrypted(p.apiKeys)) {
+        block.innerHTML = `
+          <div class="keys-header">
+            <span class="keys-label">🔒 API Keys (已加密)</span>
+            <button type="button" class="eye-btn" data-unlock>解锁</button>
+          </div>`;
+        block.querySelector('[data-unlock]').addEventListener('click', (e) => {
+          e.stopPropagation();
+          unlockPin();
+        });
+        card.append(block);
+        // 跳过下面普通渲染分支 — 直接进入下一段
+        // 注:这里不能 return,后面还有 notes / footer / actions 要渲染
+      } else {
       const lines = p.apiKeys
         .split(/\r?\n/)
         .map((l) => l.trim())
@@ -371,6 +550,7 @@
       header.append(label, eye);
       block.append(header, body);
       card.append(block);
+      }  // 关掉「明文分支」
     }
 
     // Notes
@@ -926,6 +1106,8 @@
     if (actionBtn.dataset.action === 'export') exportData();
     if (actionBtn.dataset.action === 'import') importFile.click();
     if (actionBtn.dataset.action === 'clear') clearAll();
+    if (actionBtn.dataset.action === 'pin-setup') setupPin();
+    if (actionBtn.dataset.action === 'pin-unlock') unlockPin();
     // signout 由云端模块内部直接绑定,这里不重复处理
   });
 
@@ -1096,6 +1278,19 @@
     appMainEl.hidden = false;
     menuSignout.hidden = !cloudEnabled;
     menuDividerAccount.hidden = !cloudEnabled;
+    // PIN 菜单可见性: 仅云端模式显示。
+    // - 没设过 PIN → 显示「设置加密 PIN」
+    // - 设过但本 session 未解锁 → 显示「解锁 API Keys」
+    // - 设过且已解锁 → 两项都不显示 (后续可加「修改 PIN」)
+    const pinSetup = document.getElementById('menu-pin-setup');
+    const pinUnlock = document.getElementById('menu-pin-unlock');
+    const pinDivider = document.getElementById('menu-divider-pin');
+    const hasPinSet = !!(encSettings && encSettings.enc_salt);
+    const showSetup = cloudEnabled && !hasPinSet;
+    const showUnlock = cloudEnabled && hasPinSet && !derivedKey;
+    pinSetup.hidden = !showSetup;
+    pinUnlock.hidden = !showUnlock;
+    pinDivider.hidden = !cloudEnabled || (!showSetup && !showUnlock);
     renderProjects();
     renderIdeas();
     renderRenewals();
@@ -1262,10 +1457,15 @@
         handleIdeaChange)
       .subscribe();
   }
-  function handleProjectChange(payload) {
+  async function handleProjectChange(payload) {
     const t = payload.eventType;
     if (t === 'INSERT' || t === 'UPDATE') {
       const p = rowToProject(payload.new);
+      // 加密的话试着用当前 derivedKey 解开,失败就保留密文
+      if (derivedKey && isEncrypted(p.apiKeys)) {
+        try { p.apiKeys = await decryptWithKey(derivedKey, p.apiKeys); }
+        catch (e) { /* 留着密文,UI 会显示「已加密」 */ }
+      }
       const idx = state.projects.findIndex((x) => x.id === p.id);
       if (idx >= 0) state.projects[idx] = p; else state.projects.push(p);
     } else if (t === 'DELETE') {
@@ -1344,6 +1544,7 @@
       await maybeMigrateLocalToCloud(userId);
       const data = await cloudLoadAll(userId);
       state = data;
+      encSettings = await loadUserSettings(userId);
       setupRealtime(userId);
     } catch (err) {
       cloudError('云端连接失败,显示空状态。请刷新重试', err);
@@ -1357,6 +1558,8 @@
     }
     currentUserId = null;
     state = { projects: [], ideas: [] };
+    derivedKey = null;       // 退出后清掉密钥,下次登录要重新输 PIN
+    encSettings = null;
     showEmailStep();
     showAuth();
   }
