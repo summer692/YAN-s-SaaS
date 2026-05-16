@@ -241,6 +241,7 @@
       notes: r.notes || '',
       createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
       updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : Date.now(),
+      deletedAt: r.deleted_at ? new Date(r.deleted_at).getTime() : null,
     };
   }
   function ideaToRow(i, userId) {
@@ -259,6 +260,7 @@
       tag: r.tag || '其他',
       priority: r.priority || '中',
       createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+      deletedAt: r.deleted_at ? new Date(r.deleted_at).getTime() : null,
     };
   }
 
@@ -301,8 +303,20 @@
   }
   async function removeProjectRemote(id) {
     if (!currentUserId) { save(); return; }
-    const { error } = await cloud.from('projects').delete().eq('id', id);
+    // 软删除:打 deleted_at 时间戳,数据留在表里。RLS 已禁止真删除。
+    const { error } = await cloud
+      .from('projects')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id);
     if (error) cloudError('删除项目失败', error);
+  }
+  async function restoreProjectRemote(id) {
+    if (!currentUserId) return;
+    const { error } = await cloud
+      .from('projects')
+      .update({ deleted_at: null })
+      .eq('id', id);
+    if (error) cloudError('恢复项目失败', error);
   }
   async function persistIdea(i) {
     if (!currentUserId) { save(); return; }
@@ -316,8 +330,19 @@
   }
   async function removeIdeaRemote(id) {
     if (!currentUserId) { save(); return; }
-    const { error } = await cloud.from('ideas').delete().eq('id', id);
+    const { error } = await cloud
+      .from('ideas')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id);
     if (error) cloudError('删除灵感失败', error);
+  }
+  async function restoreIdeaRemote(id) {
+    if (!currentUserId) return;
+    const { error } = await cloud
+      .from('ideas')
+      .update({ deleted_at: null })
+      .eq('id', id);
+    if (error) cloudError('恢复灵感失败', error);
   }
 
   // ---------- Tab switching ----------
@@ -364,6 +389,7 @@
 
   function renderProjects() {
     const filtered = state.projects.filter((p) => {
+      if (p.deletedAt) return false;  // 软删项目不显示在列表里
       const statusOk = currentFilter === 'all' || p.status === currentFilter;
       const searchOk = matchesSearch(p.name, p.notes, p.stack, p.domain, p.registrar);
       return statusOk && searchOk;
@@ -761,7 +787,7 @@
   });
 
   function renderIdeas() {
-    const filtered = state.ideas.filter((i) => matchesSearch(i.content, i.tag));
+    const filtered = state.ideas.filter((i) => !i.deletedAt && matchesSearch(i.content, i.tag));
     ideaList.innerHTML = '';
     if (filtered.length === 0 && state.ideas.length > 0) {
       ideaEmpty.textContent = '没有匹配的灵感。';
@@ -873,7 +899,7 @@
   const costTableWrap = document.querySelector('#costs .table-wrap');
 
   function renderCosts() {
-    const projects = state.projects;
+    const projects = state.projects.filter((p) => !p.deletedAt);
     const totalCost = sum(projects.map((p) => Number(p.monthlyCost) || 0));
     const totalRev = sum(projects.map((p) => Number(p.monthlyRevenue) || 0));
     const net = totalRev - totalCost;
@@ -942,8 +968,8 @@
   const btnCopySnapshot = document.getElementById('btn-copy-snapshot');
 
   function renderReview() {
-    const projects = state.projects;
-    const ideas = state.ideas;
+    const projects = state.projects.filter((p) => !p.deletedAt);
+    const ideas = state.ideas.filter((i) => !i.deletedAt);
 
     const developing = projects.filter((p) => p.status === '开发中');
     const stuck = developing.filter((p) => (Number(p.progress) || 0) < 30);
@@ -961,8 +987,8 @@
   }
 
   function buildSnapshot() {
-    const projects = state.projects;
-    const ideas = state.ideas;
+    const projects = state.projects.filter((p) => !p.deletedAt);
+    const ideas = state.ideas.filter((i) => !i.deletedAt);
     const lines = [];
     lines.push('# 我的 SaaS 项目快照');
     lines.push(`生成时间: ${new Date().toLocaleString('zh-CN')}`);
@@ -1027,6 +1053,7 @@
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const items = [];
     state.projects.forEach((p) => {
+      if (p.deletedAt) return;
       if (!p.domainExpiry) return;
       const expiry = new Date(p.domainExpiry);
       if (isNaN(expiry)) return;
@@ -1108,6 +1135,7 @@
     if (actionBtn.dataset.action === 'clear') clearAll();
     if (actionBtn.dataset.action === 'pin-setup') setupPin();
     if (actionBtn.dataset.action === 'pin-unlock') unlockPin();
+    if (actionBtn.dataset.action === 'trash') openTrash();
     // signout 由云端模块内部直接绑定,这里不重复处理
   });
 
@@ -1142,9 +1170,12 @@
       if (currentUserId) {
         // 云端模式:整批 upsert 到 Supabase
         if (!mode) {
-          // 覆盖模式:先清云端所有数据
-          await cloud.from('projects').delete().eq('user_id', currentUserId);
-          await cloud.from('ideas').delete().eq('user_id', currentUserId);
+          // 覆盖模式:把现有数据全部软删 (进废纸篓,30 天可恢复)
+          const now = new Date().toISOString();
+          await cloud.from('projects').update({ deleted_at: now })
+            .eq('user_id', currentUserId).is('deleted_at', null);
+          await cloud.from('ideas').update({ deleted_at: now })
+            .eq('user_id', currentUserId).is('deleted_at', null);
         }
         if (projects.length) {
           const { error } = await cloud.from('projects')
@@ -1198,8 +1229,12 @@
     renderIdeas();
     renderRenewals();
     if (currentUserId) {
-      await cloud.from('projects').delete().eq('user_id', currentUserId);
-      await cloud.from('ideas').delete().eq('user_id', currentUserId);
+      // 软删: 标记 deleted_at,数据进废纸篓
+      const now = new Date().toISOString();
+      await cloud.from('projects').update({ deleted_at: now })
+        .eq('user_id', currentUserId).is('deleted_at', null);
+      await cloud.from('ideas').update({ deleted_at: now })
+        .eq('user_id', currentUserId).is('deleted_at', null);
     } else {
       save();
     }
@@ -1291,6 +1326,16 @@
     pinSetup.hidden = !showSetup;
     pinUnlock.hidden = !showUnlock;
     pinDivider.hidden = !cloudEnabled || (!showSetup && !showUnlock);
+    // 废纸篓菜单:云端模式 + 有任意软删项时显示
+    const trashCount = state.projects.filter((p) => p.deletedAt).length
+                     + state.ideas.filter((i) => i.deletedAt).length;
+    const menuTrash = document.getElementById('menu-trash');
+    const menuTrashDivider = document.getElementById('menu-divider-trash');
+    const menuTrashBadge = document.getElementById('menu-trash-count');
+    const showTrash = cloudEnabled && trashCount > 0;
+    menuTrash.hidden = !showTrash;
+    menuTrashDivider.hidden = !showTrash;
+    menuTrashBadge.textContent = trashCount > 0 ? trashCount : '';
     renderProjects();
     renderIdeas();
     renderRenewals();
@@ -1300,6 +1345,72 @@
     authView.hidden = false;
     appHeader.hidden = true;
     appMainEl.hidden = true;
+  }
+
+  // 废纸篓 -------------------------------------------------------------
+  const trashModal = document.getElementById('trash-modal');
+  trashModal.querySelectorAll('[data-close]').forEach((el) =>
+    el.addEventListener('click', () => { trashModal.hidden = true; })
+  );
+
+  function openTrash() {
+    renderTrash();
+    trashModal.hidden = false;
+  }
+  function renderTrash() {
+    const tp = state.projects.filter((p) => p.deletedAt).sort((a, b) => b.deletedAt - a.deletedAt);
+    const ti = state.ideas.filter((i) => i.deletedAt).sort((a, b) => b.deletedAt - a.deletedAt);
+    document.getElementById('trash-projects-count').textContent = `(${tp.length})`;
+    document.getElementById('trash-ideas-count').textContent = `(${ti.length})`;
+    document.getElementById('trash-empty').hidden = (tp.length + ti.length) > 0;
+
+    const projList = document.getElementById('trash-projects-list');
+    projList.innerHTML = '';
+    tp.forEach((p) => {
+      const row = document.createElement('div');
+      row.className = 'trash-row';
+      row.innerHTML = `
+        <div class="trash-info">
+          <div class="trash-name">${escapeHtml(p.name)}</div>
+          <div class="trash-meta">删除于 ${formatDate(p.deletedAt)}</div>
+        </div>
+        <button class="trash-restore">恢复</button>
+      `;
+      row.querySelector('.trash-restore').addEventListener('click', async () => {
+        const idx = state.projects.findIndex((x) => x.id === p.id);
+        if (idx >= 0) state.projects[idx] = { ...state.projects[idx], deletedAt: null };
+        renderTrash();
+        renderProjects();
+        renderRenewals();
+        showApp();  // 刷新菜单 badge
+        await restoreProjectRemote(p.id);
+      });
+      projList.append(row);
+    });
+
+    const ideaList = document.getElementById('trash-ideas-list');
+    ideaList.innerHTML = '';
+    ti.forEach((i) => {
+      const row = document.createElement('div');
+      row.className = 'trash-row';
+      const preview = i.content.length > 60 ? i.content.slice(0, 60) + '…' : i.content;
+      row.innerHTML = `
+        <div class="trash-info">
+          <div class="trash-name">${escapeHtml(preview)}</div>
+          <div class="trash-meta">删除于 ${formatDate(i.deletedAt)}</div>
+        </div>
+        <button class="trash-restore">恢复</button>
+      `;
+      row.querySelector('.trash-restore').addEventListener('click', async () => {
+        const idx = state.ideas.findIndex((x) => x.id === i.id);
+        if (idx >= 0) state.ideas[idx] = { ...state.ideas[idx], deletedAt: null };
+        renderTrash();
+        renderIdeas();
+        showApp();
+        await restoreIdeaRemote(i.id);
+      });
+      ideaList.append(row);
+    });
   }
 
   // 登录页两步表单的可见性切换 (外层定义,因为 exitCloudMode 也要用)
@@ -1469,10 +1580,14 @@
       const idx = state.projects.findIndex((x) => x.id === p.id);
       if (idx >= 0) state.projects[idx] = p; else state.projects.push(p);
     } else if (t === 'DELETE') {
+      // 软删上线后实际不会再走这条 (RLS 已禁 DELETE),
+      // 留着兼容 cascade 等异常情况
       state.projects = state.projects.filter((x) => x.id !== payload.old.id);
     }
     renderProjects();
     renderRenewals();
+    if (!trashModal.hidden) renderTrash();
+    showApp();  // 刷菜单 badge
   }
   function handleIdeaChange(payload) {
     const t = payload.eventType;
@@ -1484,6 +1599,8 @@
       state.ideas = state.ideas.filter((x) => x.id !== payload.old.id);
     }
     renderIdeas();
+    if (!trashModal.hidden) renderTrash();
+    showApp();
   }
 
   // 本地 → 云端迁移 (仅首次登录后,本地有数据 + 云端为空时触发) ----------
