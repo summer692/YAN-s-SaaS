@@ -8,7 +8,7 @@
   const LOCAL_BACKUP_KEY = 'saas-command:pre-cloud-backup:v1';
   const THEME_KEY = 'saas-command:theme';
   const LAST_EMAIL_KEY = 'atlas:last-email';  // 登录时帮用户记住邮箱
-  const APP_VERSION = 'atlas-v31';
+  const APP_VERSION = 'atlas-v32';
   const CLOUD_POLL_MS = 15000;
   const CLOUD_TIMEOUT_MS = 12000;
   const VALID_THEMES = ['white', 'black', 'gray', 'blue', 'green', 'pink'];
@@ -2035,39 +2035,18 @@
     }
   }
 
-  // ---------- Service Worker + 自动更新 ----------
-  // 流程：
-  //  1) 注册时若已有 waiting worker（上次未刷新），立即提示
-  //  2) 之后每次 updatefound，新 SW 状态变为 installed 时提示
-  //  3) 每小时主动 reg.update() 拉一次（长时间停留场景）
-  //  4) 用户点「立即刷新」→ postMessage SKIP_WAITING → controllerchange → reload
-  //  5) 用户忽略也没关系：下次冷启动新 SW 自动激活
+  // ---------- Service Worker cleanup ----------
+  // v32 起不再使用 PWA 强缓存。普通刷新应该直接拿线上最新版。
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register(`service-worker.js?v=${APP_VERSION}`)
-        .then((reg) => {
-          if (reg.waiting && navigator.serviceWorker.controller) {
-            showUpdateBanner(reg.waiting);
-          }
-          reg.addEventListener('updatefound', () => {
-            const installing = reg.installing;
-            if (!installing) return;
-            installing.addEventListener('statechange', () => {
-              if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-                showUpdateBanner(installing);
-              }
-            });
-          });
-          setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
-        })
+      navigator.serviceWorker.getRegistrations()
+        .then((regs) => Promise.all(regs.map((reg) => reg.unregister())))
         .catch(() => {});
-
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (refreshing) return;
-        refreshing = true;
-        window.location.reload();
-      });
+      if ('caches' in window) {
+        caches.keys()
+          .then((keys) => Promise.all(keys.filter((key) => key.startsWith('atlas-')).map((key) => caches.delete(key))))
+          .catch(() => {});
+      }
     });
   }
 

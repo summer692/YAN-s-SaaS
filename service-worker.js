@@ -1,100 +1,28 @@
-/* Atlas — Service Worker
- * 缓存策略：页面入口 network-first；版本化静态资源 cache-first。
- * 更新策略：新 SW 安装后进入 waiting 状态，由页面 postMessage SKIP_WAITING
- *           来激活，避免打断正在使用的用户。下次冷启动也会自动激活。
- *
- * 部署提示：每次推送代码请把 CACHE_VERSION 的数字 +1，否则浏览器不会发现
- *           SW 文件变化，新版本不会被检测到。 */
+/* Atlas — Service Worker cleanup
+ * v32 起不再使用 PWA 强缓存。这个文件只负责注销旧 service worker
+ * 并清掉历史 Atlas 缓存，让普通刷新直接拿线上最新版本。 */
 
-const CACHE_VERSION = 'atlas-v31';
-const CORE_ASSETS = [
-  './app.js?v=atlas-v31',
-  './styles.css?v=atlas-v31',
-  './themes.css?v=atlas-v31',
-  './config.js?v=atlas-v31',
-  './manifest.json',
-  './icons/icon.svg',
-  './icons/icon-maskable.svg',
-  './icons/apple-touch-icon.png',
-  './icons/apple-touch-icon-120.png',
-  './icons/apple-touch-icon-152.png',
-  './icons/apple-touch-icon-167.png',
-  './icons/apple-touch-icon-180.png',
-];
+const CACHE_VERSION = 'atlas-v32';
+
+async function clearAtlasCaches() {
+  if (!self.caches) return;
+  const keys = await caches.keys();
+  await Promise.all(keys.filter((key) => key.startsWith('atlas-')).map((key) => caches.delete(key)));
+}
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) =>
-      // cache: 'reload' 绕过 HTTP 缓存，保证装入 SW 缓存的是网络最新版本
-      cache.addAll(CORE_ASSETS.map((url) => new Request(url, { cache: 'reload' })))
-    )
-  );
   self.skipWaiting();
+  event.waitUntil(clearAtlasCaches());
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)))
-      )
+    clearAtlasCaches()
       .then(() => self.clients.claim())
+      .then(() => self.registration.unregister())
   );
 });
 
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
-
-self.addEventListener('fetch', (event) => {
-  const req = event.request;
-  if (req.method !== 'GET') return;
-  const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return;
-  if (url.pathname.endsWith('/service-worker.js')) return;
-
-  const wantsHtml = req.mode === 'navigate'
-    || (req.headers.get('accept') || '').includes('text/html');
-
-  if (wantsHtml) {
-    event.respondWith(
-      fetch(new Request(req, { cache: 'reload' }))
-        .then((res) => {
-          if (res && res.ok) {
-            const clone = res.clone();
-            caches.open(CACHE_VERSION).then((cache) => cache.put('./index.html', clone));
-          }
-          return res;
-        })
-        .catch(() => caches.match('./index.html'))
-    );
-    return;
-  }
-
-  event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) {
-        fetch(req)
-          .then((res) => {
-            if (res && res.ok) {
-              caches.open(CACHE_VERSION).then((cache) => cache.put(req, res.clone()));
-            }
-          })
-          .catch(() => {});
-        return cached;
-      }
-      return fetch(req)
-        .then((res) => {
-          if (res && res.ok) {
-            const clone = res.clone();
-            caches.open(CACHE_VERSION).then((cache) => cache.put(req, clone));
-          }
-          return res;
-        })
-        .catch(() => caches.match('./index.html'));
-    })
-  );
+self.addEventListener('fetch', () => {
+  // Intentionally empty: let the browser/network handle every request.
 });
