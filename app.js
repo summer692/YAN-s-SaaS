@@ -5,9 +5,10 @@
   'use strict';
 
   const STORAGE_KEY = 'saas-command:v1';
+  const LOCAL_BACKUP_KEY = 'saas-command:pre-cloud-backup:v1';
   const THEME_KEY = 'saas-command:theme';
   const LAST_EMAIL_KEY = 'atlas:last-email';  // 登录时帮用户记住邮箱
-  const APP_VERSION = 'atlas-v29';
+  const APP_VERSION = 'atlas-v30';
   const CLOUD_POLL_MS = 15000;
   const CLOUD_TIMEOUT_MS = 12000;
   const VALID_THEMES = ['white', 'black', 'gray', 'blue', 'green', 'pink'];
@@ -38,9 +39,16 @@
     return items.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }
 
-  function mergeStateFromCloud(data) {
-    state.projects = sortByCreatedDesc(mergeById(state.projects, data.projects || []));
-    state.ideas = sortByCreatedDesc(mergeById(state.ideas, data.ideas || []));
+  function applyCloudState(data) {
+    const pendingProjects = state.projects.filter((p) => p.pendingSync);
+    const pendingIdeas = state.ideas.filter((i) => i.pendingSync);
+    try {
+      localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify({ savedAt: Date.now(), state }));
+    } catch (err) {
+      console.warn('pre-cloud backup failed', err);
+    }
+    state.projects = sortByCreatedDesc(mergeById(data.projects || [], pendingProjects));
+    state.ideas = sortByCreatedDesc(mergeById(data.ideas || [], pendingIdeas));
     save();
   }
 
@@ -393,40 +401,6 @@
     return true;
   }
 
-  async function backfillMissingLocalToCloud() {
-    if (!cloud || !currentUserId) return true;
-    const localProjects = state.projects.filter((p) => UUID_RE.test(p.id));
-    const localIdeas = state.ideas.filter((i) => UUID_RE.test(i.id));
-
-    if (localProjects.length) {
-      const { error } = await withTimeout(cloud
-        .from('projects')
-        .upsert(localProjects.map((p) => projectToRow(p, currentUserId)), {
-          onConflict: 'id',
-          ignoreDuplicates: true,
-        }), '补备份本机项目');
-      if (error) {
-        cloudSoftError('本机项目补备份失败', error);
-        return false;
-      }
-    }
-
-    if (localIdeas.length) {
-      const { error } = await withTimeout(cloud
-        .from('ideas')
-        .upsert(localIdeas.map((i) => ideaToRow(i, currentUserId)), {
-          onConflict: 'id',
-          ignoreDuplicates: true,
-        }), '补备份本机灵感');
-      if (error) {
-        cloudSoftError('本机灵感补备份失败', error);
-        return false;
-      }
-    }
-
-    return true;
-  }
-
   async function cloudRefreshAll(reason, options = {}) {
     if (!cloud || !currentUserId) return false;
     if (cloudRefreshInFlight) return cloudRefreshInFlight;
@@ -437,9 +411,8 @@
       try {
         await flushPendingSync(reason);
         const data = await cloudLoadAll(currentUserId);
-        mergeStateFromCloud(data);
+        applyCloudState(data);
         await decryptAllProjectsInPlace();
-        backfillMissingLocalToCloud().catch((err) => cloudSoftError('本机补备份稍后重试', err));
         lastSyncAt = Date.now();
         const activeProjects = state.projects.filter((p) => !p.deletedAt).length;
         const activeIdeas = state.ideas.filter((i) => !i.deletedAt).length;
