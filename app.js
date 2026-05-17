@@ -7,7 +7,7 @@
   const STORAGE_KEY = 'saas-command:v1';
   const THEME_KEY = 'saas-command:theme';
   const LAST_EMAIL_KEY = 'atlas:last-email';  // 登录时帮用户记住邮箱
-  const APP_VERSION = 'atlas-v27';
+  const APP_VERSION = 'atlas-v28';
   const CLOUD_POLL_MS = 15000;
   const VALID_THEMES = ['white', 'black', 'gray', 'blue', 'green', 'pink'];
 
@@ -2052,7 +2052,7 @@
   //  5) 用户忽略也没关系：下次冷启动新 SW 自动激活
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('service-worker.js')
+      navigator.serviceWorker.register(`service-worker.js?v=${APP_VERSION}`)
         .then((reg) => {
           if (reg.waiting && navigator.serviceWorker.controller) {
             showUpdateBanner(reg.waiting);
