@@ -58,8 +58,8 @@
       to { opacity: 1; }
     }
   </style>
-  <link rel="stylesheet" href="themes.css" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="themes.css?v=atlas-v28" />
+  <link rel="stylesheet" href="styles.css?v=atlas-v28" />
 </head>
 <body data-theme="white">
   <div id="splash" aria-hidden="true">
@@ -389,8 +389,36 @@
     </div>
   </div>
 
-  <script src="config.js"></script>
+  <script>
+    (() => {
+      const params = new URLSearchParams(window.location.search);
+      if (!params.has('fresh') && !params.has('reset-cache')) return;
+      const key = 'atlas-cache-reset-v28';
+      if (sessionStorage.getItem(key) === 'done') return;
+      sessionStorage.setItem(key, 'done');
+
+      const jobs = [];
+      if ('serviceWorker' in navigator) {
+        jobs.push(
+          navigator.serviceWorker.getRegistrations()
+            .then((regs) => Promise.all(regs.map((reg) => reg.unregister())))
+            .catch(() => {})
+        );
+      }
+      if ('caches' in window) {
+        jobs.push(
+          caches.keys()
+            .then((keys) => Promise.all(keys.filter((k) => k.startsWith('atlas-')).map((k) => caches.delete(k))))
+            .catch(() => {})
+        );
+      }
+      Promise.all(jobs).finally(() => {
+        window.location.replace(window.location.origin + window.location.pathname);
+      });
+    })();
+  </script>
+  <script src="config.js?v=atlas-v28"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=atlas-v28"></script>
 </body>
 </html>
