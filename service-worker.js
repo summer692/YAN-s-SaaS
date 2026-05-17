@@ -6,14 +6,14 @@
  * 部署提示：每次推送代码请把 CACHE_VERSION 的数字 +1，否则浏览器不会发现
  *           SW 文件变化，新版本不会被检测到。 */
 
-const CACHE_VERSION = 'atlas-v29';
+const CACHE_VERSION = 'atlas-v30';
 const CORE_ASSETS = [
   './',
   './index.html',
-  './app.js?v=atlas-v29',
-  './styles.css?v=atlas-v29',
-  './themes.css?v=atlas-v29',
-  './config.js?v=atlas-v29',
+  './app.js?v=atlas-v30',
+  './styles.css?v=atlas-v30',
+  './themes.css?v=atlas-v30',
+  './config.js?v=atlas-v30',
   './manifest.json',
   './icons/icon.svg',
   './icons/icon-maskable.svg',
