@@ -7,7 +7,7 @@
   const STORAGE_KEY = 'saas-command:v1';
   const THEME_KEY = 'saas-command:theme';
   const LAST_EMAIL_KEY = 'atlas:last-email';  // 登录时帮用户记住邮箱
-  const APP_VERSION = 'atlas-v25';
+  const APP_VERSION = 'atlas-v26';
   const CLOUD_POLL_MS = 15000;
   const VALID_THEMES = ['white', 'black', 'gray', 'blue', 'green', 'pink'];
 
@@ -31,6 +31,16 @@
 
   function save() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function sortByCreatedDesc(items) {
+    return items.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  }
+
+  function mergeStateFromCloud(data) {
+    state.projects = sortByCreatedDesc(mergeById(state.projects, data.projects || []));
+    state.ideas = sortByCreatedDesc(mergeById(state.ideas, data.ideas || []));
+    save();
   }
 
   function uid() {
@@ -331,7 +341,7 @@
     cloudRefreshInFlight = (async () => {
       try {
         const data = await cloudLoadAll(currentUserId);
-        state = data;
+        mergeStateFromCloud(data);
         await decryptAllProjectsInPlace();
         lastSyncAt = Date.now();
         const activeProjects = state.projects.filter((p) => !p.deletedAt).length;
@@ -388,7 +398,7 @@
       row.api_keys_cipher = await encryptWithKey(derivedKey, row.api_keys_cipher);
     }
     const { data, error } = await cloud.from('projects').upsert(row).select().single();
-    if (error) { cloudError('保存项目失败', error); return false; }
+    if (error) { cloudError('云端同步失败,已保存在本机', error); return true; }
     const updated = rowToProject(data);
     // 如果云端返回的是密文,且本地解锁着,解回内存的明文形式给 UI 用
     if (derivedKey && isEncrypted(updated.apiKeys)) {
@@ -442,7 +452,7 @@
     }
     const row = ideaToRow(i, currentUserId);
     const { data, error } = await cloud.from('ideas').upsert(row).select().single();
-    if (error) { cloudError('保存灵感失败', error); return false; }
+    if (error) { cloudError('云端同步失败,已保存在本机', error); return true; }
     const updated = rowToIdea(data);
     const idx = state.ideas.findIndex((x) => x.id === i.id || x.id === updated.id);
     if (idx >= 0) state.ideas[idx] = updated;
@@ -800,14 +810,12 @@
     const p = state.projects.find((x) => x.id === id);
     if (!p) return;
     if (!confirm(`确定把项目「${p.name}」移到废纸篓？之后可以恢复。`)) return;
+    const deletedAt = new Date().toISOString();
+    const idx = state.projects.findIndex((x) => x.id === id);
+    if (idx >= 0) state.projects[idx] = { ...state.projects[idx], deletedAt: new Date(deletedAt).getTime() };
+    save();
     if (currentUserId) {
-      const deletedAt = await removeProjectRemote(id);
-      if (!deletedAt) return;
-      const idx = state.projects.findIndex((x) => x.id === id);
-      if (idx >= 0) state.projects[idx] = { ...state.projects[idx], deletedAt: new Date(deletedAt).getTime() };
-    } else {
-      state.projects = state.projects.filter((x) => x.id !== id);
-      save();
+      removeProjectRemote(id).catch((err) => cloudError('云端同步失败,本机删除已保留', err));
     }
     renderProjects();
     renderRenewals();
@@ -887,18 +895,14 @@
 
     projectSubmit.disabled = true;
     try {
-      if (currentUserId) {
-        const ok = await persistProject(project);
-        if (!ok) return;
-      } else {
-        if (existing) Object.assign(existing, project);
-        else state.projects.push(project);
-        save();
-      }
+      if (existing) Object.assign(existing, project);
+      else state.projects.push(project);
+      save();
       closeProjectModal();
       renderProjects();
       renderRenewals();
       showApp();
+      persistProject(project).catch((err) => cloudError('云端同步失败,已保存在本机', err));
     } finally {
       projectSubmit.disabled = false;
     }
@@ -926,17 +930,13 @@
     };
     ideaSubmit.disabled = true;
     try {
-      if (currentUserId) {
-        const ok = await persistIdea(idea);
-        if (!ok) return;
-      } else {
-        state.ideas.push(idea);
-        save();
-      }
+      state.ideas.push(idea);
+      save();
       ideaInput.value = '';
       ideaInput.focus();
       renderIdeas();
       showApp();
+      persistIdea(idea).catch((err) => cloudError('云端同步失败,已保存在本机', err));
     } finally {
       ideaSubmit.disabled = false;
     }
@@ -1004,14 +1004,12 @@
 
   async function deleteIdea(id) {
     if (!confirm('把这条灵感移到废纸篓？之后可以恢复。')) return;
+    const deletedAt = new Date().toISOString();
+    const idx = state.ideas.findIndex((x) => x.id === id);
+    if (idx >= 0) state.ideas[idx] = { ...state.ideas[idx], deletedAt: new Date(deletedAt).getTime() };
+    save();
     if (currentUserId) {
-      const deletedAt = await removeIdeaRemote(id);
-      if (!deletedAt) return;
-      const idx = state.ideas.findIndex((x) => x.id === id);
-      if (idx >= 0) state.ideas[idx] = { ...state.ideas[idx], deletedAt: new Date(deletedAt).getTime() };
-    } else {
-      state.ideas = state.ideas.filter((x) => x.id !== id);
-      save();
+      removeIdeaRemote(id).catch((err) => cloudError('云端同步失败,本机删除已保留', err));
     }
     renderIdeas();
     showApp();
@@ -1338,6 +1336,7 @@
       renderProjects();
       renderIdeas();
       renderRenewals();
+      save();
       if (currentUserId) {
         // 云端模式:整批 upsert 到 Supabase
         if (!mode) {
@@ -1358,8 +1357,6 @@
             .upsert(ideas.map((i) => ideaToRow(i, currentUserId)));
           if (error) cloudError('导入灵感失败', error);
         }
-      } else {
-        save();
       }
       alert('导入成功。');
     } catch (err) {
@@ -1372,9 +1369,15 @@
   function mergeById(existing, incoming) {
     const map = new Map(existing.map((x) => [x.id, x]));
     incoming.forEach((x) => {
-      if (x && x.id) map.set(x.id, x);
+      if (!x || !x.id) return;
+      const current = map.get(x.id);
+      if (!current || itemModifiedAt(x) >= itemModifiedAt(current)) map.set(x.id, x);
     });
     return Array.from(map.values());
+  }
+
+  function itemModifiedAt(x) {
+    return Math.max(Number(x.updatedAt) || 0, Number(x.deletedAt) || 0, Number(x.createdAt) || 0);
   }
 
   function exportData() {
@@ -1396,6 +1399,7 @@
     if (!confirm('再次确认：真的全部清空？')) return;
     state.projects = [];
     state.ideas = [];
+    save();
     renderProjects();
     renderIdeas();
     renderRenewals();
@@ -1406,8 +1410,6 @@
         .eq('user_id', currentUserId).is('deleted_at', null);
       await cloud.from('ideas').update({ deleted_at: now })
         .eq('user_id', currentUserId).is('deleted_at', null);
-    } else {
-      save();
     }
   }
 
@@ -1521,13 +1523,13 @@
     pinSetup.hidden = !showSetup;
     pinUnlock.hidden = !showUnlock;
     pinDivider.hidden = !cloudEnabled || (!showSetup && !showUnlock);
-    // 废纸篓菜单:云端模式 + 有任意软删项时显示
+    // 废纸篓菜单:本地优先,只要本机有软删项就显示
     const trashCount = state.projects.filter((p) => p.deletedAt).length
                      + state.ideas.filter((i) => i.deletedAt).length;
     const menuTrash = document.getElementById('menu-trash');
     const menuTrashDivider = document.getElementById('menu-divider-trash');
     const menuTrashBadge = document.getElementById('menu-trash-count');
-    const showTrash = cloudEnabled && trashCount > 0;
+    const showTrash = trashCount > 0;
     menuTrash.hidden = !showTrash;
     menuTrashDivider.hidden = !showTrash;
     menuTrashBadge.textContent = trashCount > 0 ? trashCount : '';
@@ -1571,14 +1573,14 @@
         <button class="trash-restore">恢复</button>
       `;
       row.querySelector('.trash-restore').addEventListener('click', async () => {
-        const ok = await restoreProjectRemote(p.id);
-        if (!ok) return;
         const idx = state.projects.findIndex((x) => x.id === p.id);
         if (idx >= 0) state.projects[idx] = { ...state.projects[idx], deletedAt: null };
+        save();
         renderTrash();
         renderProjects();
         renderRenewals();
         showApp();  // 刷新菜单 badge
+        restoreProjectRemote(p.id).catch((err) => cloudError('云端同步失败,本机恢复已保留', err));
       });
       projList.append(row);
     });
@@ -1597,13 +1599,13 @@
         <button class="trash-restore">恢复</button>
       `;
       row.querySelector('.trash-restore').addEventListener('click', async () => {
-        const ok = await restoreIdeaRemote(i.id);
-        if (!ok) return;
         const idx = state.ideas.findIndex((x) => x.id === i.id);
         if (idx >= 0) state.ideas[idx] = { ...state.ideas[idx], deletedAt: null };
+        save();
         renderTrash();
         renderIdeas();
         showApp();
+        restoreIdeaRemote(i.id).catch((err) => cloudError('云端同步失败,本机恢复已保留', err));
       });
       ideaList.append(row);
     });
@@ -1853,7 +1855,7 @@
       }
     }
     if (allOk) {
-      localStorage.removeItem(STORAGE_KEY);
+      setSyncStatus('ok', '已备份云端', `本机数据仍保留 · ${APP_VERSION}`);
     }
   }
 
