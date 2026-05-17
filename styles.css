@@ -258,7 +258,34 @@ button {
   font-weight: 500;
 }
 
-.header-tools { display: flex; align-items: center; padding-top: 6px; }
+.header-tools { display: flex; align-items: center; gap: 8px; padding-top: 6px; }
+.sync-pill {
+  border: none;
+  border-radius: 999px;
+  padding: 5px 9px;
+  min-width: 58px;
+  max-width: 128px;
+  background: var(--status-pill-bg);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sync-pill[data-state="ok"] {
+  background: rgba(52, 199, 89, 0.16);
+  color: #248A3D;
+}
+.sync-pill[data-state="syncing"] {
+  background: rgba(0, 122, 255, 0.14);
+  color: #007AFF;
+}
+.sync-pill[data-state="error"] {
+  background: rgba(255, 59, 48, 0.14);
+  color: #D70015;
+}
 .header-menu { position: relative; }
 
 /* iOS 分段控件（segmented control） --------------------------------- */
@@ -1096,5 +1123,6 @@ button {
   .field-row { flex-direction: column; gap: var(--gap-2); }
   .brand h1 { font-size: 24px; }
   .shortcut-hint { display: none; }
+  .sync-pill { max-width: 96px; }
   .card-title { font-size: 20px; }
 }
