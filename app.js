@@ -7,6 +7,8 @@
   const STORAGE_KEY = 'saas-command:v1';
   const THEME_KEY = 'saas-command:theme';
   const LAST_EMAIL_KEY = 'atlas:last-email';  // 登录时帮用户记住邮箱
+  const APP_VERSION = 'atlas-v25';
+  const CLOUD_POLL_MS = 15000;
   const VALID_THEMES = ['white', 'black', 'gray', 'blue', 'green', 'pink'];
 
   /** @type {{projects: Project[], ideas: Idea[]}} */
@@ -44,6 +46,49 @@
   // currentUserId 由登录流程设置 (见文件末尾的 enterCloudMode)。
   // 未登录或没接云端时为 null,所有 persist/remove 自动降级到 localStorage。
   let currentUserId = null;
+  let lastSyncAt = null;
+  let lastSyncText = '尚未同步';
+  let lastSyncDetail = '';
+  let syncPollTimer = null;
+  let cloudRefreshInFlight = null;
+
+  const syncStatusBtn = document.getElementById('sync-status');
+
+  function shortUserId() {
+    return currentUserId ? currentUserId.slice(0, 8) : '未登录';
+  }
+
+  function clock(ts) {
+    if (!ts) return '无';
+    return new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function setSyncStatus(kind, text, detail) {
+    lastSyncText = text;
+    lastSyncDetail = detail || '';
+    if (!syncStatusBtn) return;
+    syncStatusBtn.hidden = false;
+    syncStatusBtn.dataset.state = kind;
+    syncStatusBtn.textContent = text;
+    syncStatusBtn.title = detail ? `${text}\n${detail}` : text;
+  }
+
+  function buildSyncDiagnostics() {
+    const activeProjects = state.projects.filter((p) => !p.deletedAt).length;
+    const trashedProjects = state.projects.filter((p) => p.deletedAt).length;
+    const activeIdeas = state.ideas.filter((i) => !i.deletedAt).length;
+    const trashedIdeas = state.ideas.filter((i) => i.deletedAt).length;
+    return [
+      `版本: ${APP_VERSION}`,
+      `云端配置: ${cloudEnabled ? '已配置' : '未配置,本机模式'}`,
+      `用户: ${shortUserId()}`,
+      `同步: ${lastSyncText}`,
+      `最后成功: ${clock(lastSyncAt)}`,
+      lastSyncDetail ? `详情: ${lastSyncDetail}` : '',
+      `项目: ${activeProjects} 个正常 / ${trashedProjects} 个废纸篓`,
+      `灵感: ${activeIdeas} 条正常 / ${trashedIdeas} 条废纸篓`,
+    ].filter(Boolean).join('\n');
+  }
 
   // ---------- API Key 客户端加密 (Phase 3) ----------
   // 用 PIN(6 位数字) + 随机 salt 通过 PBKDF2 派生 256-bit AES-GCM 密钥。
@@ -266,8 +311,8 @@
 
   async function cloudLoadAll(userId) {
     const [pRes, iRes] = await Promise.all([
-      cloud.from('projects').select('*').eq('user_id', userId),
-      cloud.from('ideas').select('*').eq('user_id', userId),
+      cloud.from('projects').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+      cloud.from('ideas').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
     ]);
     if (pRes.error) throw new Error('加载项目失败: ' + pRes.error.message);
     if (iRes.error) throw new Error('加载灵感失败: ' + iRes.error.message);
@@ -277,13 +322,66 @@
     };
   }
 
+  async function cloudRefreshAll(reason, options = {}) {
+    if (!cloud || !currentUserId) return false;
+    if (cloudRefreshInFlight) return cloudRefreshInFlight;
+    const silent = !!options.silent;
+    if (!silent) setSyncStatus('syncing', '同步中', `${reason || '手动'} · 用户 ${shortUserId()}`);
+
+    cloudRefreshInFlight = (async () => {
+      try {
+        const data = await cloudLoadAll(currentUserId);
+        state = data;
+        await decryptAllProjectsInPlace();
+        lastSyncAt = Date.now();
+        const activeProjects = state.projects.filter((p) => !p.deletedAt).length;
+        const activeIdeas = state.ideas.filter((i) => !i.deletedAt).length;
+        setSyncStatus(
+          'ok',
+          `已同步 ${clock(lastSyncAt)}`,
+          `${reason || '自动'} · 用户 ${shortUserId()} · 项目 ${activeProjects} · 灵感 ${activeIdeas} · ${APP_VERSION}`
+        );
+        renderVisibleState();
+        return true;
+      } catch (err) {
+        const msg = err && err.message ? err.message : String(err);
+        console.error('cloudRefreshAll:', err);
+        setSyncStatus('error', '同步失败', `${msg} · 用户 ${shortUserId()} · ${APP_VERSION}`);
+        return false;
+      } finally {
+        cloudRefreshInFlight = null;
+      }
+    })();
+    return cloudRefreshInFlight;
+  }
+
+  function startCloudPolling() {
+    stopCloudPolling();
+    if (!cloud || !currentUserId) return;
+    syncPollTimer = setInterval(() => {
+      if (!document.hidden) cloudRefreshAll('定时拉取', { silent: true });
+    }, CLOUD_POLL_MS);
+  }
+
+  function stopCloudPolling() {
+    if (syncPollTimer) {
+      clearInterval(syncPollTimer);
+      syncPollTimer = null;
+    }
+  }
+
   function cloudError(label, error) {
     console.error(label, error);
+    setSyncStatus('error', label, `${error.message || error} · 用户 ${shortUserId()} · ${APP_VERSION}`);
     alert(`${label}:${error.message || error}`);
   }
 
   async function persistProject(p) {
-    if (!currentUserId) { save(); return true; }
+    if (!currentUserId) {
+      save();
+      setSyncStatus('ok', '本机保存', `未连接云端 · ${APP_VERSION}`);
+      return true;
+    }
     const row = projectToRow(p, currentUserId);
     // 加密 API Keys (如果 PIN 已设且已解锁,且当前还是明文)
     if (derivedKey && row.api_keys_cipher && !isEncrypted(row.api_keys_cipher)) {
@@ -300,10 +398,16 @@
     const idx = state.projects.findIndex((x) => x.id === p.id || x.id === updated.id);
     if (idx >= 0) state.projects[idx] = updated;
     else state.projects.push(updated);
+    lastSyncAt = Date.now();
+    setSyncStatus('ok', `已保存 ${clock(lastSyncAt)}`, `项目 ${updated.name} · 用户 ${shortUserId()} · ${APP_VERSION}`);
     return true;
   }
   async function removeProjectRemote(id) {
-    if (!currentUserId) { save(); return new Date().toISOString(); }
+    if (!currentUserId) {
+      save();
+      setSyncStatus('ok', '本机保存', `未连接云端 · ${APP_VERSION}`);
+      return new Date().toISOString();
+    }
     // 软删除:打 deleted_at 时间戳,数据留在表里。RLS 已禁止真删除。
     const deletedAt = new Date().toISOString();
     const { error } = await cloud
@@ -312,6 +416,8 @@
       .eq('id', id)
       .eq('user_id', currentUserId);
     if (error) { cloudError('删除项目失败', error); return null; }
+    lastSyncAt = Date.now();
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `项目进废纸篓 · 用户 ${shortUserId()} · ${APP_VERSION}`);
     return deletedAt;
   }
   async function restoreProjectRemote(id) {
@@ -324,10 +430,16 @@
       .select('id')
       .single();
     if (error) { cloudError('恢复项目失败', error); return false; }
+    lastSyncAt = Date.now();
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `项目已恢复 · 用户 ${shortUserId()} · ${APP_VERSION}`);
     return true;
   }
   async function persistIdea(i) {
-    if (!currentUserId) { save(); return true; }
+    if (!currentUserId) {
+      save();
+      setSyncStatus('ok', '本机保存', `未连接云端 · ${APP_VERSION}`);
+      return true;
+    }
     const row = ideaToRow(i, currentUserId);
     const { data, error } = await cloud.from('ideas').upsert(row).select().single();
     if (error) { cloudError('保存灵感失败', error); return false; }
@@ -335,10 +447,16 @@
     const idx = state.ideas.findIndex((x) => x.id === i.id || x.id === updated.id);
     if (idx >= 0) state.ideas[idx] = updated;
     else state.ideas.push(updated);
+    lastSyncAt = Date.now();
+    setSyncStatus('ok', `已保存 ${clock(lastSyncAt)}`, `灵感已保存 · 用户 ${shortUserId()} · ${APP_VERSION}`);
     return true;
   }
   async function removeIdeaRemote(id) {
-    if (!currentUserId) { save(); return new Date().toISOString(); }
+    if (!currentUserId) {
+      save();
+      setSyncStatus('ok', '本机保存', `未连接云端 · ${APP_VERSION}`);
+      return new Date().toISOString();
+    }
     const deletedAt = new Date().toISOString();
     const { error } = await cloud
       .from('ideas')
@@ -346,6 +464,8 @@
       .eq('id', id)
       .eq('user_id', currentUserId);
     if (error) { cloudError('删除灵感失败', error); return null; }
+    lastSyncAt = Date.now();
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `灵感进废纸篓 · 用户 ${shortUserId()} · ${APP_VERSION}`);
     return deletedAt;
   }
   async function restoreIdeaRemote(id) {
@@ -358,6 +478,8 @@
       .select('id')
       .single();
     if (error) { cloudError('恢复灵感失败', error); return false; }
+    lastSyncAt = Date.now();
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `灵感已恢复 · 用户 ${shortUserId()} · ${APP_VERSION}`);
     return true;
   }
 
@@ -1356,6 +1478,30 @@
   const menuSignout = document.getElementById('menu-signout');
   const menuDividerAccount = document.getElementById('menu-divider-account');
 
+  if (syncStatusBtn) {
+    syncStatusBtn.addEventListener('click', async () => {
+      if (cloud && currentUserId) await cloudRefreshAll('手动点击同步');
+      alert(buildSyncDiagnostics());
+    });
+  }
+
+  window.addEventListener('online', () => {
+    if (cloud && currentUserId) cloudRefreshAll('网络恢复');
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && cloud && currentUserId) cloudRefreshAll('回到前台', { silent: true });
+  });
+
+  function renderVisibleState() {
+    renderProjects();
+    renderIdeas();
+    renderRenewals();
+    const activeTab = document.querySelector('.tab.active');
+    if (activeTab && activeTab.dataset.tab === 'costs') renderCosts();
+    if (activeTab && activeTab.dataset.tab === 'review') renderReview();
+    if (trashModal && !trashModal.hidden) renderTrash();
+  }
+
   function showApp() {
     authView.hidden = true;
     appHeader.hidden = false;
@@ -1385,15 +1531,14 @@
     menuTrash.hidden = !showTrash;
     menuTrashDivider.hidden = !showTrash;
     menuTrashBadge.textContent = trashCount > 0 ? trashCount : '';
-    renderProjects();
-    renderIdeas();
-    renderRenewals();
+    renderVisibleState();
   }
 
   function showAuth() {
     authView.hidden = false;
     appHeader.hidden = true;
     appMainEl.hidden = true;
+    if (syncStatusBtn) syncStatusBtn.hidden = true;
   }
 
   // 废纸篓 -------------------------------------------------------------
@@ -1617,7 +1762,14 @@
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'ideas', filter: `user_id=eq.${userId}` },
         handleIdeaChange)
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `Realtime 已连接 · 用户 ${shortUserId()} · ${APP_VERSION}`);
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          const msg = err && err.message ? err.message : status;
+          setSyncStatus('error', '实时同步失败', `${msg} · 会继续每 ${CLOUD_POLL_MS / 1000} 秒拉取云端`);
+        }
+      });
   }
   async function handleProjectChange(payload) {
     const t = payload.eventType;
@@ -1635,9 +1787,9 @@
       // 留着兼容 cascade 等异常情况
       state.projects = state.projects.filter((x) => x.id !== payload.old.id);
     }
-    renderProjects();
-    renderRenewals();
-    if (!trashModal.hidden) renderTrash();
+    lastSyncAt = Date.now();
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `收到项目 ${t} · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    renderVisibleState();
     showApp();  // 刷菜单 badge
   }
   function handleIdeaChange(payload) {
@@ -1649,8 +1801,9 @@
     } else if (t === 'DELETE') {
       state.ideas = state.ideas.filter((x) => x.id !== payload.old.id);
     }
-    renderIdeas();
-    if (!trashModal.hidden) renderTrash();
+    lastSyncAt = Date.now();
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `收到灵感 ${t} · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    renderVisibleState();
     showApp();
   }
 
@@ -1706,14 +1859,19 @@
 
   // 进入云端模式 (首次登录 或 onAuthStateChange 触发 SIGNED_IN) ----------
   async function enterCloudMode(userId) {
-    if (currentUserId === userId) return;  // 防重复触发
+    if (currentUserId === userId) {
+      startCloudPolling();
+      await cloudRefreshAll('登录态刷新', { silent: true });
+      return;
+    }
     currentUserId = userId;
     try {
+      setSyncStatus('syncing', '连接云端', `用户 ${shortUserId()} · ${APP_VERSION}`);
       await maybeMigrateLocalToCloud(userId);
-      const data = await cloudLoadAll(userId);
-      state = data;
       encSettings = await loadUserSettings(userId);
+      await cloudRefreshAll('登录后加载');
       setupRealtime(userId);
+      startCloudPolling();
     } catch (err) {
       cloudError('云端连接失败,显示空状态。请刷新重试', err);
     }
@@ -1728,6 +1886,8 @@
     state = { projects: [], ideas: [] };
     derivedKey = null;       // 退出后清掉密钥,下次登录要重新输 PIN
     encSettings = null;
+    lastSyncAt = null;
+    stopCloudPolling();
     showEmailStep();
     showAuth();
   }
@@ -1736,6 +1896,7 @@
   async function bootstrap() {
     if (!cloud) {
       // 没接云端 (config 空) — 单机模式,保持原行为
+      setSyncStatus('ok', '本机模式', `未配置 Supabase · ${APP_VERSION}`);
       showApp();
       return;
     }
