@@ -283,14 +283,14 @@
   }
 
   async function persistProject(p) {
-    if (!currentUserId) { save(); return; }
+    if (!currentUserId) { save(); return true; }
     const row = projectToRow(p, currentUserId);
     // 加密 API Keys (如果 PIN 已设且已解锁,且当前还是明文)
     if (derivedKey && row.api_keys_cipher && !isEncrypted(row.api_keys_cipher)) {
       row.api_keys_cipher = await encryptWithKey(derivedKey, row.api_keys_cipher);
     }
     const { data, error } = await cloud.from('projects').upsert(row).select().single();
-    if (error) { cloudError('保存项目失败', error); return; }
+    if (error) { cloudError('保存项目失败', error); return false; }
     const updated = rowToProject(data);
     // 如果云端返回的是密文,且本地解锁着,解回内存的明文形式给 UI 用
     if (derivedKey && isEncrypted(updated.apiKeys)) {
@@ -300,49 +300,65 @@
     const idx = state.projects.findIndex((x) => x.id === p.id || x.id === updated.id);
     if (idx >= 0) state.projects[idx] = updated;
     else state.projects.push(updated);
+    return true;
   }
   async function removeProjectRemote(id) {
-    if (!currentUserId) { save(); return; }
+    if (!currentUserId) { save(); return new Date().toISOString(); }
     // 软删除:打 deleted_at 时间戳,数据留在表里。RLS 已禁止真删除。
+    const deletedAt = new Date().toISOString();
     const { error } = await cloud
       .from('projects')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) cloudError('删除项目失败', error);
+      .update({ deleted_at: deletedAt })
+      .eq('id', id)
+      .eq('user_id', currentUserId);
+    if (error) { cloudError('删除项目失败', error); return null; }
+    return deletedAt;
   }
   async function restoreProjectRemote(id) {
-    if (!currentUserId) return;
+    if (!currentUserId) return true;
     const { error } = await cloud
       .from('projects')
       .update({ deleted_at: null })
-      .eq('id', id);
-    if (error) cloudError('恢复项目失败', error);
+      .eq('id', id)
+      .eq('user_id', currentUserId)
+      .select('id')
+      .single();
+    if (error) { cloudError('恢复项目失败', error); return false; }
+    return true;
   }
   async function persistIdea(i) {
-    if (!currentUserId) { save(); return; }
+    if (!currentUserId) { save(); return true; }
     const row = ideaToRow(i, currentUserId);
     const { data, error } = await cloud.from('ideas').upsert(row).select().single();
-    if (error) { cloudError('保存灵感失败', error); return; }
+    if (error) { cloudError('保存灵感失败', error); return false; }
     const updated = rowToIdea(data);
     const idx = state.ideas.findIndex((x) => x.id === i.id || x.id === updated.id);
     if (idx >= 0) state.ideas[idx] = updated;
     else state.ideas.push(updated);
+    return true;
   }
   async function removeIdeaRemote(id) {
-    if (!currentUserId) { save(); return; }
+    if (!currentUserId) { save(); return new Date().toISOString(); }
+    const deletedAt = new Date().toISOString();
     const { error } = await cloud
       .from('ideas')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) cloudError('删除灵感失败', error);
+      .update({ deleted_at: deletedAt })
+      .eq('id', id)
+      .eq('user_id', currentUserId);
+    if (error) { cloudError('删除灵感失败', error); return null; }
+    return deletedAt;
   }
   async function restoreIdeaRemote(id) {
-    if (!currentUserId) return;
+    if (!currentUserId) return true;
     const { error } = await cloud
       .from('ideas')
       .update({ deleted_at: null })
-      .eq('id', id);
-    if (error) cloudError('恢复灵感失败', error);
+      .eq('id', id)
+      .eq('user_id', currentUserId)
+      .select('id')
+      .single();
+    if (error) { cloudError('恢复灵感失败', error); return false; }
+    return true;
   }
 
   // ---------- Tab switching ----------
@@ -658,14 +674,22 @@
     return `${v.slice(0, 4)}••••${v.slice(-4)}`;
   }
 
-  function deleteProject(id) {
+  async function deleteProject(id) {
     const p = state.projects.find((x) => x.id === id);
     if (!p) return;
-    if (!confirm(`确定删除项目「${p.name}」？此操作不可恢复。`)) return;
-    state.projects = state.projects.filter((x) => x.id !== id);
+    if (!confirm(`确定把项目「${p.name}」移到废纸篓？之后可以恢复。`)) return;
+    if (currentUserId) {
+      const deletedAt = await removeProjectRemote(id);
+      if (!deletedAt) return;
+      const idx = state.projects.findIndex((x) => x.id === id);
+      if (idx >= 0) state.projects[idx] = { ...state.projects[idx], deletedAt: new Date(deletedAt).getTime() };
+    } else {
+      state.projects = state.projects.filter((x) => x.id !== id);
+      save();
+    }
     renderProjects();
     renderRenewals();
-    removeProjectRemote(id);  // 后端真删,失败时控制台会报但不阻塞 UI
+    showApp();
   }
 
   // ---------- Project modal ----------
@@ -674,6 +698,7 @@
   const projectModalTitle = document.getElementById('project-modal-title');
   const progressInput = projectForm.elements['progress'];
   const progressReadout = document.getElementById('progress-readout');
+  const projectSubmit = projectForm.querySelector('button[type="submit"]');
 
   progressInput.addEventListener('input', () => {
     progressReadout.textContent = `${progressInput.value}%`;
@@ -738,18 +763,23 @@
 
     if (!project.name) return;
 
-    if (existing) {
-      Object.assign(existing, project);
-    } else {
-      state.projects.push(project);
+    projectSubmit.disabled = true;
+    try {
+      if (currentUserId) {
+        const ok = await persistProject(project);
+        if (!ok) return;
+      } else {
+        if (existing) Object.assign(existing, project);
+        else state.projects.push(project);
+        save();
+      }
+      closeProjectModal();
+      renderProjects();
+      renderRenewals();
+      showApp();
+    } finally {
+      projectSubmit.disabled = false;
     }
-    renderProjects();
-    renderRenewals();
-    closeProjectModal();
-    // 持久化 (cloud 模式时把 DB 回写的真实 id/时间戳合并回 state,然后再渲染一次)
-    await persistProject(project);
-    renderProjects();
-    renderRenewals();
   });
 
   // ---------- Ideas ----------
@@ -759,6 +789,7 @@
   const ideaInput = document.getElementById('idea-quick-input');
   const ideaTag = document.getElementById('idea-quick-tag');
   const ideaPriority = document.getElementById('idea-quick-priority');
+  const ideaSubmit = ideaForm.querySelector('button[type="submit"]');
 
   ideaForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -771,12 +802,22 @@
       priority: ideaPriority.value,
       createdAt: Date.now(),
     };
-    state.ideas.push(idea);
-    ideaInput.value = '';
-    ideaInput.focus();
-    renderIdeas();
-    await persistIdea(idea);
-    renderIdeas();
+    ideaSubmit.disabled = true;
+    try {
+      if (currentUserId) {
+        const ok = await persistIdea(idea);
+        if (!ok) return;
+      } else {
+        state.ideas.push(idea);
+        save();
+      }
+      ideaInput.value = '';
+      ideaInput.focus();
+      renderIdeas();
+      showApp();
+    } finally {
+      ideaSubmit.disabled = false;
+    }
   });
 
   ideaInput.addEventListener('keydown', (e) => {
@@ -839,11 +880,19 @@
     return el;
   }
 
-  function deleteIdea(id) {
-    if (!confirm('删除这条灵感？')) return;
-    state.ideas = state.ideas.filter((x) => x.id !== id);
+  async function deleteIdea(id) {
+    if (!confirm('把这条灵感移到废纸篓？之后可以恢复。')) return;
+    if (currentUserId) {
+      const deletedAt = await removeIdeaRemote(id);
+      if (!deletedAt) return;
+      const idx = state.ideas.findIndex((x) => x.id === id);
+      if (idx >= 0) state.ideas[idx] = { ...state.ideas[idx], deletedAt: new Date(deletedAt).getTime() };
+    } else {
+      state.ideas = state.ideas.filter((x) => x.id !== id);
+      save();
+    }
     renderIdeas();
-    removeIdeaRemote(id);
+    showApp();
   }
 
   // ---------- Utilities ----------
@@ -1377,13 +1426,14 @@
         <button class="trash-restore">恢复</button>
       `;
       row.querySelector('.trash-restore').addEventListener('click', async () => {
+        const ok = await restoreProjectRemote(p.id);
+        if (!ok) return;
         const idx = state.projects.findIndex((x) => x.id === p.id);
         if (idx >= 0) state.projects[idx] = { ...state.projects[idx], deletedAt: null };
         renderTrash();
         renderProjects();
         renderRenewals();
         showApp();  // 刷新菜单 badge
-        await restoreProjectRemote(p.id);
       });
       projList.append(row);
     });
@@ -1402,12 +1452,13 @@
         <button class="trash-restore">恢复</button>
       `;
       row.querySelector('.trash-restore').addEventListener('click', async () => {
+        const ok = await restoreIdeaRemote(i.id);
+        if (!ok) return;
         const idx = state.ideas.findIndex((x) => x.id === i.id);
         if (idx >= 0) state.ideas[idx] = { ...state.ideas[idx], deletedAt: null };
         renderTrash();
         renderIdeas();
         showApp();
-        await restoreIdeaRemote(i.id);
       });
       ideaList.append(row);
     });
