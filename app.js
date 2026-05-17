@@ -7,8 +7,9 @@
   const STORAGE_KEY = 'saas-command:v1';
   const THEME_KEY = 'saas-command:theme';
   const LAST_EMAIL_KEY = 'atlas:last-email';  // 登录时帮用户记住邮箱
-  const APP_VERSION = 'atlas-v28';
+  const APP_VERSION = 'atlas-v29';
   const CLOUD_POLL_MS = 15000;
+  const CLOUD_TIMEOUT_MS = 12000;
   const VALID_THEMES = ['white', 'black', 'gray', 'blue', 'green', 'pink'];
 
   /** @type {{projects: Project[], ideas: Idea[]}} */
@@ -41,6 +42,14 @@
     state.projects = sortByCreatedDesc(mergeById(state.projects, data.projects || []));
     state.ideas = sortByCreatedDesc(mergeById(state.ideas, data.ideas || []));
     save();
+  }
+
+  function withTimeout(promise, label, ms = CLOUD_TIMEOUT_MS) {
+    let timer = null;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label}超时,稍后会自动重试`)), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
   }
 
   function uid() {
@@ -167,18 +176,18 @@
   }
 
   async function loadUserSettings(userId) {
-    const { data, error } = await cloud
+    const { data, error } = await withTimeout(cloud
       .from('user_settings')
       .select('*')
       .eq('user_id', userId)
-      .maybeSingle();
+      .maybeSingle(), '读取用户设置');
     if (error) { console.error('loadUserSettings:', error); return null; }
     return data;
   }
   async function saveUserSettings(userId, patch) {
-    const { error } = await cloud
+    const { error } = await withTimeout(cloud
       .from('user_settings')
-      .upsert({ user_id: userId, ...patch });
+      .upsert({ user_id: userId, ...patch }), '保存用户设置');
     if (error) cloudError('保存设置失败', error);
   }
 
@@ -229,7 +238,10 @@
     const toReencrypt = state.projects.filter((p) => p.apiKeys && !isEncrypted(p.apiKeys));
     for (const p of toReencrypt) {
       const cipher = await encryptWithKey(key, p.apiKeys);
-      const { error } = await cloud.from('projects').update({ api_keys_cipher: cipher }).eq('id', p.id);
+      const { error } = await withTimeout(
+        cloud.from('projects').update({ api_keys_cipher: cipher }).eq('id', p.id),
+        '上传加密密钥'
+      );
       if (error) cloudError('加密上传失败 ' + p.name, error);
       // state 仍保留明文 (用户在本 session 中能看)
     }
@@ -325,10 +337,10 @@
   }
 
   async function cloudLoadAll(userId) {
-    const [pRes, iRes] = await Promise.all([
+    const [pRes, iRes] = await withTimeout(Promise.all([
       cloud.from('projects').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
       cloud.from('ideas').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-    ]);
+    ]), '读取云端');
     if (pRes.error) throw new Error('加载项目失败: ' + pRes.error.message);
     if (iRes.error) throw new Error('加载灵感失败: ' + iRes.error.message);
     return {
@@ -355,9 +367,9 @@
     );
 
     if (pendingProjects.length) {
-      const { error } = await cloud
+      const { error } = await withTimeout(cloud
         .from('projects')
-        .upsert(pendingProjects.map((p) => projectToRow(p, currentUserId)), { onConflict: 'id' });
+        .upsert(pendingProjects.map((p) => projectToRow(p, currentUserId)), { onConflict: 'id' }), '上传本机项目');
       if (error) {
         cloudSoftError('本机项目待同步', error);
         return false;
@@ -366,9 +378,9 @@
     }
 
     if (pendingIdeas.length) {
-      const { error } = await cloud
+      const { error } = await withTimeout(cloud
         .from('ideas')
-        .upsert(pendingIdeas.map((i) => ideaToRow(i, currentUserId)), { onConflict: 'id' });
+        .upsert(pendingIdeas.map((i) => ideaToRow(i, currentUserId)), { onConflict: 'id' }), '上传本机灵感');
       if (error) {
         cloudSoftError('本机灵感待同步', error);
         return false;
@@ -387,12 +399,12 @@
     const localIdeas = state.ideas.filter((i) => UUID_RE.test(i.id));
 
     if (localProjects.length) {
-      const { error } = await cloud
+      const { error } = await withTimeout(cloud
         .from('projects')
         .upsert(localProjects.map((p) => projectToRow(p, currentUserId)), {
           onConflict: 'id',
           ignoreDuplicates: true,
-        });
+        }), '补备份本机项目');
       if (error) {
         cloudSoftError('本机项目补备份失败', error);
         return false;
@@ -400,12 +412,12 @@
     }
 
     if (localIdeas.length) {
-      const { error } = await cloud
+      const { error } = await withTimeout(cloud
         .from('ideas')
         .upsert(localIdeas.map((i) => ideaToRow(i, currentUserId)), {
           onConflict: 'id',
           ignoreDuplicates: true,
-        });
+        }), '补备份本机灵感');
       if (error) {
         cloudSoftError('本机灵感补备份失败', error);
         return false;
@@ -424,10 +436,10 @@
     cloudRefreshInFlight = (async () => {
       try {
         await flushPendingSync(reason);
-        await backfillMissingLocalToCloud();
         const data = await cloudLoadAll(currentUserId);
         mergeStateFromCloud(data);
         await decryptAllProjectsInPlace();
+        backfillMissingLocalToCloud().catch((err) => cloudSoftError('本机补备份稍后重试', err));
         lastSyncAt = Date.now();
         const activeProjects = state.projects.filter((p) => !p.deletedAt).length;
         const activeIdeas = state.ideas.filter((i) => !i.deletedAt).length;
@@ -441,7 +453,8 @@
       } catch (err) {
         const msg = err && err.message ? err.message : String(err);
         console.error('cloudRefreshAll:', err);
-        setSyncStatus('error', '同步失败', `${msg} · 用户 ${shortUserId()} · ${APP_VERSION}`);
+        const label = msg.includes('超时') ? '同步超时' : '同步失败';
+        setSyncStatus('error', label, `${msg} · 本机数据已保留 · 用户 ${shortUserId()} · ${APP_VERSION}`);
         return false;
       } finally {
         cloudRefreshInFlight = null;
@@ -482,7 +495,10 @@
     if (derivedKey && row.api_keys_cipher && !isEncrypted(row.api_keys_cipher)) {
       row.api_keys_cipher = await encryptWithKey(derivedKey, row.api_keys_cipher);
     }
-    const { data, error } = await cloud.from('projects').upsert(row).select().single();
+    const { data, error } = await withTimeout(
+      cloud.from('projects').upsert(row).select().single(),
+      '保存项目'
+    );
     if (error) { cloudSoftError('云端同步失败,已保存在本机', error); return false; }
     const updated = rowToProject(data);
     // 如果云端返回的是密文,且本地解锁着,解回内存的明文形式给 UI 用
@@ -506,11 +522,11 @@
     }
     // 软删除:打 deleted_at 时间戳,数据留在表里。RLS 已禁止真删除。
     const deletedAt = new Date().toISOString();
-    const { error } = await cloud
+    const { error } = await withTimeout(cloud
       .from('projects')
       .update({ deleted_at: deletedAt })
       .eq('id', id)
-      .eq('user_id', currentUserId);
+      .eq('user_id', currentUserId), '删除项目');
     if (error) { cloudError('删除项目失败', error); return null; }
     lastSyncAt = Date.now();
     setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `项目进废纸篓 · 用户 ${shortUserId()} · ${APP_VERSION}`);
@@ -518,13 +534,13 @@
   }
   async function restoreProjectRemote(id) {
     if (!currentUserId) return true;
-    const { error } = await cloud
+    const { error } = await withTimeout(cloud
       .from('projects')
       .update({ deleted_at: null })
       .eq('id', id)
       .eq('user_id', currentUserId)
       .select('id')
-      .single();
+      .single(), '恢复项目');
     if (error) { cloudError('恢复项目失败', error); return false; }
     lastSyncAt = Date.now();
     setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `项目已恢复 · 用户 ${shortUserId()} · ${APP_VERSION}`);
@@ -537,7 +553,10 @@
       return true;
     }
     const row = ideaToRow(i, currentUserId);
-    const { data, error } = await cloud.from('ideas').upsert(row).select().single();
+    const { data, error } = await withTimeout(
+      cloud.from('ideas').upsert(row).select().single(),
+      '保存灵感'
+    );
     if (error) { cloudSoftError('云端同步失败,已保存在本机', error); return false; }
     const updated = rowToIdea(data);
     const idx = state.ideas.findIndex((x) => x.id === i.id || x.id === updated.id);
@@ -555,11 +574,11 @@
       return new Date().toISOString();
     }
     const deletedAt = new Date().toISOString();
-    const { error } = await cloud
+    const { error } = await withTimeout(cloud
       .from('ideas')
       .update({ deleted_at: deletedAt })
       .eq('id', id)
-      .eq('user_id', currentUserId);
+      .eq('user_id', currentUserId), '删除灵感');
     if (error) { cloudError('删除灵感失败', error); return null; }
     lastSyncAt = Date.now();
     setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `灵感进废纸篓 · 用户 ${shortUserId()} · ${APP_VERSION}`);
@@ -567,13 +586,13 @@
   }
   async function restoreIdeaRemote(id) {
     if (!currentUserId) return true;
-    const { error } = await cloud
+    const { error } = await withTimeout(cloud
       .from('ideas')
       .update({ deleted_at: null })
       .eq('id', id)
       .eq('user_id', currentUserId)
       .select('id')
-      .single();
+      .single(), '恢复灵感');
     if (error) { cloudError('恢复灵感失败', error); return false; }
     lastSyncAt = Date.now();
     setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `灵感已恢复 · 用户 ${shortUserId()} · ${APP_VERSION}`);
@@ -1439,19 +1458,19 @@
         if (!mode) {
           // 覆盖模式:把现有数据全部软删 (进废纸篓,30 天可恢复)
           const now = new Date().toISOString();
-          await cloud.from('projects').update({ deleted_at: now })
-            .eq('user_id', currentUserId).is('deleted_at', null);
-          await cloud.from('ideas').update({ deleted_at: now })
-            .eq('user_id', currentUserId).is('deleted_at', null);
+          await withTimeout(cloud.from('projects').update({ deleted_at: now })
+            .eq('user_id', currentUserId).is('deleted_at', null), '导入前归档项目');
+          await withTimeout(cloud.from('ideas').update({ deleted_at: now })
+            .eq('user_id', currentUserId).is('deleted_at', null), '导入前归档灵感');
         }
         if (projects.length) {
-          const { error } = await cloud.from('projects')
-            .upsert(projects.map((p) => projectToRow(p, currentUserId)));
+          const { error } = await withTimeout(cloud.from('projects')
+            .upsert(projects.map((p) => projectToRow(p, currentUserId))), '导入项目');
           if (error) cloudError('导入项目失败', error);
         }
         if (ideas.length) {
-          const { error } = await cloud.from('ideas')
-            .upsert(ideas.map((i) => ideaToRow(i, currentUserId)));
+          const { error } = await withTimeout(cloud.from('ideas')
+            .upsert(ideas.map((i) => ideaToRow(i, currentUserId))), '导入灵感');
           if (error) cloudError('导入灵感失败', error);
         }
       }
@@ -1519,10 +1538,10 @@
     if (currentUserId) {
       // 软删: 标记 deleted_at,数据进废纸篓
       const now = new Date().toISOString();
-      await cloud.from('projects').update({ deleted_at: now })
-        .eq('user_id', currentUserId).is('deleted_at', null);
-      await cloud.from('ideas').update({ deleted_at: now })
-        .eq('user_id', currentUserId).is('deleted_at', null);
+      await withTimeout(cloud.from('projects').update({ deleted_at: now })
+        .eq('user_id', currentUserId).is('deleted_at', null), '清空项目');
+      await withTimeout(cloud.from('ideas').update({ deleted_at: now })
+        .eq('user_id', currentUserId).is('deleted_at', null), '清空灵感');
     }
   }
 
@@ -1788,7 +1807,7 @@
       authSubmitEmail.disabled = true;
       setStatus('正在发送…');
       try {
-        const { error } = await cloud.auth.signInWithOtp({
+        const { error } = await withTimeout(cloud.auth.signInWithOtp({
           email,
           options: {
             emailRedirectTo: window.location.origin + window.location.pathname,
@@ -1796,7 +1815,7 @@
             // (个人 App 场景,新账号只在 Supabase 后台手动添加)
             shouldCreateUser: false,
           },
-        });
+        }), '发送登录码');
         if (error) {
           // Supabase 在 shouldCreateUser=false 且邮箱未注册时,
           // 错误信息可能是 'Signups not allowed' 或 'User not found' 之类
@@ -1827,11 +1846,11 @@
       authSubmitCode.disabled = true;
       setStatus('验证中…');
       try {
-        const { error } = await cloud.auth.verifyOtp({
+        const { error } = await withTimeout(cloud.auth.verifyOtp({
           email: pendingEmail,
           token,
           type: 'email',
-        });
+        }), '验证登录码');
         if (error) throw error;
         // 成功的话 onAuthStateChange 会立刻触发 SIGNED_IN,
         // 那边的 showApp() 会负责切到主界面,这里不用额外做
@@ -1959,7 +1978,7 @@
     let allOk = true;
     if (localProjects.length) {
       const rows = localProjects.map((p) => projectToRow(p, userId));
-      const { error } = await cloud.from('projects').insert(rows);
+      const { error } = await withTimeout(cloud.from('projects').insert(rows), '上传本机项目');
       if (error) {
         cloudError('上传项目失败 (本地数据保留)', error);
         allOk = false;
@@ -1967,7 +1986,7 @@
     }
     if (allOk && localIdeas.length) {
       const rows = localIdeas.map((i) => ideaToRow(i, userId));
-      const { error } = await cloud.from('ideas').insert(rows);
+      const { error } = await withTimeout(cloud.from('ideas').insert(rows), '上传本机灵感');
       if (error) {
         cloudError('上传灵感失败 (本地数据保留)', error);
         allOk = false;
@@ -2021,7 +2040,7 @@
       showApp();
       return;
     }
-    const { data: { session } } = await cloud.auth.getSession();
+    const { data: { session } } = await withTimeout(cloud.auth.getSession(), '读取登录状态');
     if (session) await enterCloudMode(session.user.id);
     else showAuth();
   }
