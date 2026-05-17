@@ -510,6 +510,11 @@ button {
 /* 废纸篓 ----------------------------------------------------------- */
 .trash-section { margin-bottom: var(--gap-2); }
 .trash-section:last-of-type { margin-bottom: 0; }
+.trash-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 var(--gap-2);
+}
 .trash-section-title {
   margin: 0 0 var(--gap-1);
   font-size: 13px;
@@ -541,7 +546,9 @@ button {
   color: var(--text-tertiary);
   margin-top: 2px;
 }
-.trash-restore {
+.trash-restore,
+.trash-permanent,
+.trash-empty-btn {
   background: transparent;
   color: var(--accent);
   border: none;
@@ -551,7 +558,19 @@ button {
   font-weight: 500;
   flex-shrink: 0;
 }
-.trash-restore:hover { background: var(--bg-input); }
+.trash-permanent,
+.trash-empty-btn {
+  color: #FF3B30;
+}
+.trash-restore:hover,
+.trash-permanent:hover,
+.trash-empty-btn:hover {
+  background: var(--bg-input);
+}
+.trash-empty-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 
 /* Main + views -------------------------------------------------------- */
 .app-main {
