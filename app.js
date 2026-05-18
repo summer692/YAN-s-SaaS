@@ -8,9 +8,10 @@
   const LOCAL_BACKUP_KEY = 'saas-command:pre-cloud-backup:v1';
   const THEME_KEY = 'saas-command:theme';
   const LAST_EMAIL_KEY = 'atlas:last-email';  // 登录时帮用户记住邮箱
-  const APP_VERSION = 'atlas-v31';
+  const APP_VERSION = 'atlas-v34';
   const CLOUD_POLL_MS = 15000;
   const CLOUD_TIMEOUT_MS = 12000;
+  const PIN_MENU_ENABLED = false;
   const VALID_THEMES = ['white', 'black', 'gray', 'blue', 'green', 'pink'];
 
   /** @type {{projects: Project[], ideas: Idea[]}} */
@@ -519,6 +520,19 @@
     setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `项目已恢复 · 用户 ${shortUserId()} · ${APP_VERSION}`);
     return true;
   }
+  async function hardDeleteProjectRemote(id) {
+    if (!currentUserId) return true;
+    const { error } = await withTimeout(cloud
+      .from('projects')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', currentUserId)
+      .not('deleted_at', 'is', null), '永久删除项目');
+    if (error) { cloudError('永久删除项目失败', error); return false; }
+    lastSyncAt = Date.now();
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `项目已永久删除 · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    return true;
+  }
   async function persistIdea(i) {
     if (!currentUserId) {
       save();
@@ -569,6 +583,32 @@
     if (error) { cloudError('恢复灵感失败', error); return false; }
     lastSyncAt = Date.now();
     setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `灵感已恢复 · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    return true;
+  }
+  async function hardDeleteIdeaRemote(id) {
+    if (!currentUserId) return true;
+    const { error } = await withTimeout(cloud
+      .from('ideas')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', currentUserId)
+      .not('deleted_at', 'is', null), '永久删除灵感');
+    if (error) { cloudError('永久删除灵感失败', error); return false; }
+    lastSyncAt = Date.now();
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `灵感已永久删除 · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    return true;
+  }
+
+  async function hardDeleteAllTrashRemote() {
+    if (!currentUserId) return true;
+    const [pRes, iRes] = await withTimeout(Promise.all([
+      cloud.from('projects').delete().eq('user_id', currentUserId).not('deleted_at', 'is', null),
+      cloud.from('ideas').delete().eq('user_id', currentUserId).not('deleted_at', 'is', null),
+    ]), '清空废纸篓');
+    if (pRes.error) { cloudError('清空项目废纸篓失败', pRes.error); return false; }
+    if (iRes.error) { cloudError('清空灵感废纸篓失败', iRes.error); return false; }
+    lastSyncAt = Date.now();
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `废纸篓已清空 · 用户 ${shortUserId()} · ${APP_VERSION}`);
     return true;
   }
 
@@ -1615,16 +1655,14 @@
     appMainEl.hidden = false;
     menuSignout.hidden = !cloudEnabled;
     menuDividerAccount.hidden = !cloudEnabled;
-    // PIN 菜单可见性: 仅云端模式显示。
-    // - 没设过 PIN → 显示「设置加密 PIN」
-    // - 设过但本 session 未解锁 → 显示「解锁 API Keys」
-    // - 设过且已解锁 → 两项都不显示 (后续可加「修改 PIN」)
+    // PIN 是 API Keys 的高级保护。默认不放在主菜单里，保持界面简洁。
+    // 如果历史项目里已有加密 API Keys，项目卡片仍会显示「解锁」按钮。
     const pinSetup = document.getElementById('menu-pin-setup');
     const pinUnlock = document.getElementById('menu-pin-unlock');
     const pinDivider = document.getElementById('menu-divider-pin');
     const hasPinSet = !!(encSettings && encSettings.enc_salt);
-    const showSetup = cloudEnabled && !hasPinSet;
-    const showUnlock = cloudEnabled && hasPinSet && !derivedKey;
+    const showSetup = PIN_MENU_ENABLED && cloudEnabled && !hasPinSet;
+    const showUnlock = PIN_MENU_ENABLED && cloudEnabled && hasPinSet && !derivedKey;
     pinSetup.hidden = !showSetup;
     pinUnlock.hidden = !showUnlock;
     pinDivider.hidden = !cloudEnabled || (!showSetup && !showUnlock);
@@ -1650,9 +1688,11 @@
 
   // 废纸篓 -------------------------------------------------------------
   const trashModal = document.getElementById('trash-modal');
+  const trashEmptyAllBtn = document.getElementById('trash-empty-all');
   trashModal.querySelectorAll('[data-close]').forEach((el) =>
     el.addEventListener('click', () => { trashModal.hidden = true; })
   );
+  trashEmptyAllBtn.addEventListener('click', emptyTrashPermanently);
 
   function openTrash() {
     renderTrash();
@@ -1664,6 +1704,7 @@
     document.getElementById('trash-projects-count').textContent = `(${tp.length})`;
     document.getElementById('trash-ideas-count').textContent = `(${ti.length})`;
     document.getElementById('trash-empty').hidden = (tp.length + ti.length) > 0;
+    trashEmptyAllBtn.disabled = (tp.length + ti.length) === 0;
 
     const projList = document.getElementById('trash-projects-list');
     projList.innerHTML = '';
@@ -1676,6 +1717,7 @@
           <div class="trash-meta">删除于 ${formatDate(p.deletedAt)}</div>
         </div>
         <button class="trash-restore">恢复</button>
+        <button class="trash-permanent">永久删除</button>
       `;
       row.querySelector('.trash-restore').addEventListener('click', async () => {
         const idx = state.projects.findIndex((x) => x.id === p.id);
@@ -1689,6 +1731,7 @@
           .then((ok) => { if (ok) clearProjectPending(p.id); })
           .catch((err) => cloudSoftError('云端同步失败,本机恢复已保留', err));
       });
+      row.querySelector('.trash-permanent').addEventListener('click', () => hardDeleteProject(p.id, p.name));
       projList.append(row);
     });
 
@@ -1704,6 +1747,7 @@
           <div class="trash-meta">删除于 ${formatDate(i.deletedAt)}</div>
         </div>
         <button class="trash-restore">恢复</button>
+        <button class="trash-permanent">永久删除</button>
       `;
       row.querySelector('.trash-restore').addEventListener('click', async () => {
         const idx = state.ideas.findIndex((x) => x.id === i.id);
@@ -1716,8 +1760,56 @@
           .then((ok) => { if (ok) clearIdeaPending(i.id); })
           .catch((err) => cloudSoftError('云端同步失败,本机恢复已保留', err));
       });
+      row.querySelector('.trash-permanent').addEventListener('click', () => hardDeleteIdea(i.id, preview));
       ideaList.append(row);
     });
+  }
+
+  async function hardDeleteProject(id, name) {
+    if (!confirm(`永久删除项目「${name}」？\n\n这次会从废纸篓彻底删除，之后不能恢复。`)) return;
+    if (currentUserId) {
+      const ok = await hardDeleteProjectRemote(id);
+      if (!ok) return;
+    }
+    state.projects = state.projects.filter((p) => p.id !== id);
+    save();
+    renderTrash();
+    renderProjects();
+    renderRenewals();
+    showApp();
+  }
+
+  async function hardDeleteIdea(id, preview) {
+    if (!confirm(`永久删除这条灵感？\n\n「${preview}」\n\n这次会从废纸篓彻底删除，之后不能恢复。`)) return;
+    if (currentUserId) {
+      const ok = await hardDeleteIdeaRemote(id);
+      if (!ok) return;
+    }
+    state.ideas = state.ideas.filter((i) => i.id !== id);
+    save();
+    renderTrash();
+    renderIdeas();
+    showApp();
+  }
+
+  async function emptyTrashPermanently() {
+    const tp = state.projects.filter((p) => p.deletedAt);
+    const ti = state.ideas.filter((i) => i.deletedAt);
+    const total = tp.length + ti.length;
+    if (!total) return;
+    if (!confirm(`永久清空废纸篓里的 ${total} 条数据？\n\n清空后不能恢复。`)) return;
+    if (currentUserId) {
+      const ok = await hardDeleteAllTrashRemote();
+      if (!ok) return;
+    }
+    state.projects = state.projects.filter((p) => !p.deletedAt);
+    state.ideas = state.ideas.filter((i) => !i.deletedAt);
+    save();
+    renderTrash();
+    renderProjects();
+    renderIdeas();
+    renderRenewals();
+    showApp();
   }
 
   // 登录页两步表单的可见性切换 (外层定义,因为 exitCloudMode 也要用)
@@ -2035,66 +2127,19 @@
     }
   }
 
-  // ---------- Service Worker + 自动更新 ----------
-  // 流程：
-  //  1) 注册时若已有 waiting worker（上次未刷新），立即提示
-  //  2) 之后每次 updatefound，新 SW 状态变为 installed 时提示
-  //  3) 每小时主动 reg.update() 拉一次（长时间停留场景）
-  //  4) 用户点「立即刷新」→ postMessage SKIP_WAITING → controllerchange → reload
-  //  5) 用户忽略也没关系：下次冷启动新 SW 自动激活
+  // ---------- Service Worker cleanup ----------
+  // v32 起不再使用 PWA 强缓存。普通刷新应该直接拿线上最新版。
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register(`service-worker.js?v=${APP_VERSION}`)
-        .then((reg) => {
-          if (reg.waiting && navigator.serviceWorker.controller) {
-            showUpdateBanner(reg.waiting);
-          }
-          reg.addEventListener('updatefound', () => {
-            const installing = reg.installing;
-            if (!installing) return;
-            installing.addEventListener('statechange', () => {
-              if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-                showUpdateBanner(installing);
-              }
-            });
-          });
-          setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
-        })
+      navigator.serviceWorker.getRegistrations()
+        .then((regs) => Promise.all(regs.map((reg) => reg.unregister())))
         .catch(() => {});
-
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (refreshing) return;
-        refreshing = true;
-        window.location.reload();
-      });
+      if ('caches' in window) {
+        caches.keys()
+          .then((keys) => Promise.all(keys.filter((key) => key.startsWith('atlas-')).map((key) => caches.delete(key))))
+          .catch(() => {});
+      }
     });
   }
 
-  function showUpdateBanner(waitingWorker) {
-    if (document.getElementById('update-banner')) return;
-    const banner = document.createElement('div');
-    banner.id = 'update-banner';
-    banner.className = 'update-banner';
-    const text = document.createElement('span');
-    text.className = 'update-text';
-    text.textContent = '有新版本可用';
-    const apply = document.createElement('button');
-    apply.type = 'button';
-    apply.className = 'update-now';
-    apply.textContent = '立即刷新';
-    apply.addEventListener('click', () => {
-      apply.disabled = true;
-      apply.textContent = '正在刷新…';
-      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
-    });
-    const dismiss = document.createElement('button');
-    dismiss.type = 'button';
-    dismiss.className = 'update-dismiss';
-    dismiss.setAttribute('aria-label', '稍后');
-    dismiss.textContent = '×';
-    dismiss.addEventListener('click', () => banner.remove());
-    banner.append(text, apply, dismiss);
-    document.body.prepend(banner);
-  }
 })();

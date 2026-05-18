@@ -58,8 +58,8 @@
       to { opacity: 1; }
     }
   </style>
-  <link rel="stylesheet" href="themes.css?v=atlas-v31" />
-  <link rel="stylesheet" href="styles.css?v=atlas-v31" />
+  <link rel="stylesheet" href="themes.css?v=atlas-v34" />
+  <link rel="stylesheet" href="styles.css?v=atlas-v34" />
 </head>
 <body data-theme="white">
   <div id="splash" aria-hidden="true">
@@ -376,7 +376,10 @@
         <h2>废纸篓</h2>
         <button class="icon-btn" data-close aria-label="关闭">×</button>
       </header>
-      <p class="muted" style="font-size:13px;margin:0 0 16px;">删除的项目和灵感都先到这里。点恢复就能复原。</p>
+      <p class="muted" style="font-size:13px;margin:0 0 12px;">删除的项目和灵感都先到这里。点恢复就能复原。</p>
+      <div class="trash-toolbar">
+        <button class="trash-empty-btn" id="trash-empty-all" type="button">清空废纸篓</button>
+      </div>
       <section class="trash-section">
         <h3 class="trash-section-title">已删除的项目 <span class="muted" id="trash-projects-count">(0)</span></h3>
         <div class="trash-list" id="trash-projects-list"></div>
@@ -393,7 +396,7 @@
     (() => {
       const params = new URLSearchParams(window.location.search);
       if (!params.has('fresh') && !params.has('reset-cache')) return;
-      const key = 'atlas-cache-reset-v31';
+      const key = 'atlas-cache-reset-v33';
       if (sessionStorage.getItem(key) === 'done') return;
       sessionStorage.setItem(key, 'done');
 
@@ -417,8 +420,8 @@
       });
     })();
   </script>
-  <script src="config.js?v=atlas-v31"></script>
+  <script src="config.js?v=atlas-v34"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=atlas-v31"></script>
+  <script src="app.js?v=atlas-v34"></script>
 </body>
 </html>
