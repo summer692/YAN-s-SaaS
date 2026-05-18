@@ -2142,30 +2142,4 @@
     });
   }
 
-  function showUpdateBanner(waitingWorker) {
-    if (document.getElementById('update-banner')) return;
-    const banner = document.createElement('div');
-    banner.id = 'update-banner';
-    banner.className = 'update-banner';
-    const text = document.createElement('span');
-    text.className = 'update-text';
-    text.textContent = '有新版本可用';
-    const apply = document.createElement('button');
-    apply.type = 'button';
-    apply.className = 'update-now';
-    apply.textContent = '立即刷新';
-    apply.addEventListener('click', () => {
-      apply.disabled = true;
-      apply.textContent = '正在刷新…';
-      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
-    });
-    const dismiss = document.createElement('button');
-    dismiss.type = 'button';
-    dismiss.className = 'update-dismiss';
-    dismiss.setAttribute('aria-label', '稍后');
-    dismiss.textContent = '×';
-    dismiss.addEventListener('click', () => banner.remove());
-    banner.append(text, apply, dismiss);
-    document.body.prepend(banner);
-  }
 })();

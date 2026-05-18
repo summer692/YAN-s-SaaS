@@ -162,47 +162,6 @@ button {
 .auth-status.success { color: #FFFFFF; font-weight: 500; }
 .auth-status.error { color: #FFD7D3; }
 
-/* PWA update banner --------------------------------------------------- */
-.update-banner {
-  position: sticky;
-  top: 0;
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--gap-2);
-  padding: 10px var(--gap-2);
-  background: var(--accent);
-  color: var(--accent-contrast);
-  font-size: 15px;
-  animation: update-slide-in var(--t-base) var(--ease-ios);
-}
-.update-text { font-weight: 500; }
-.update-banner .update-now {
-  background: var(--accent-contrast);
-  color: var(--accent);
-  border: none;
-  padding: 6px 14px;
-  border-radius: var(--radius-card);
-  font-weight: 600;
-  font-size: 15px;
-}
-.update-banner .update-now:disabled { opacity: 0.6; cursor: default; }
-.update-banner .update-dismiss {
-  background: transparent;
-  color: var(--accent-contrast);
-  border: none;
-  font-size: 22px;
-  line-height: 1;
-  padding: 0 4px;
-  opacity: 0.7;
-}
-.update-banner .update-dismiss:hover { opacity: 1; }
-@keyframes update-slide-in {
-  from { transform: translateY(-100%); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
 /* Header -------------------------------------------------------------- */
 .app-header {
   position: sticky;
