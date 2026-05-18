@@ -8,7 +8,7 @@
   const LOCAL_BACKUP_KEY = 'saas-command:pre-cloud-backup:v1';
   const THEME_KEY = 'saas-command:theme';
   const LAST_EMAIL_KEY = 'atlas:last-email';  // 登录时帮用户记住邮箱
-  const APP_VERSION = 'atlas-v34';
+  const ATLAS_VERSION = 'atlas-v35';
   const CLOUD_POLL_MS = 15000;
   const CLOUD_TIMEOUT_MS = 12000;
   const PIN_MENU_ENABLED = false;
@@ -109,7 +109,7 @@
     const pendingProjects = state.projects.filter((p) => p.pendingSync).length;
     const pendingIdeas = state.ideas.filter((i) => i.pendingSync).length;
     return [
-      `版本: ${APP_VERSION}`,
+      `版本: ${ATLAS_VERSION}`,
       `云端配置: ${cloudEnabled ? '已配置' : '未配置,本机模式'}`,
       `用户: ${shortUserId()}`,
       `同步: ${lastSyncText}`,
@@ -360,7 +360,7 @@
 
   function cloudSoftError(label, error) {
     console.error(label, error);
-    setSyncStatus('error', label, `${error.message || error} · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    setSyncStatus('error', label, `${error.message || error} · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
   }
 
   async function flushPendingSync(reason) {
@@ -372,7 +372,7 @@
     setSyncStatus(
       'syncing',
       '上传本机修改',
-      `${reason || '自动'} · 项目 ${pendingProjects.length} · 灵感 ${pendingIdeas.length} · 用户 ${shortUserId()} · ${APP_VERSION}`
+      `${reason || '自动'} · 项目 ${pendingProjects.length} · 灵感 ${pendingIdeas.length} · 用户 ${shortUserId()} · ${ATLAS_VERSION}`
     );
 
     if (pendingProjects.length) {
@@ -398,7 +398,7 @@
     }
 
     lastSyncAt = Date.now();
-    setSyncStatus('ok', `已上传 ${clock(lastSyncAt)}`, `本机修改已同步 · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    setSyncStatus('ok', `已上传 ${clock(lastSyncAt)}`, `本机修改已同步 · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
     return true;
   }
 
@@ -420,7 +420,7 @@
         setSyncStatus(
           'ok',
           `已同步 ${clock(lastSyncAt)}`,
-          `${reason || '自动'} · 用户 ${shortUserId()} · 项目 ${activeProjects} · 灵感 ${activeIdeas} · ${APP_VERSION}`
+          `${reason || '自动'} · 用户 ${shortUserId()} · 项目 ${activeProjects} · 灵感 ${activeIdeas} · ${ATLAS_VERSION}`
         );
         renderVisibleState();
         return true;
@@ -428,7 +428,7 @@
         const msg = err && err.message ? err.message : String(err);
         console.error('cloudRefreshAll:', err);
         const label = msg.includes('超时') ? '同步超时' : '同步失败';
-        setSyncStatus('error', label, `${msg} · 本机数据已保留 · 用户 ${shortUserId()} · ${APP_VERSION}`);
+        setSyncStatus('error', label, `${msg} · 本机数据已保留 · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
         return false;
       } finally {
         cloudRefreshInFlight = null;
@@ -454,14 +454,14 @@
 
   function cloudError(label, error) {
     console.error(label, error);
-    setSyncStatus('error', label, `${error.message || error} · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    setSyncStatus('error', label, `${error.message || error} · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
     alert(`${label}:${error.message || error}`);
   }
 
   async function persistProject(p) {
     if (!currentUserId) {
       save();
-      setSyncStatus('ok', '本机保存', `未连接云端 · ${APP_VERSION}`);
+      setSyncStatus('ok', '本机保存', `未连接云端 · ${ATLAS_VERSION}`);
       return true;
     }
     const row = projectToRow(p, currentUserId);
@@ -485,13 +485,13 @@
     else state.projects.push(updated);
     save();
     lastSyncAt = Date.now();
-    setSyncStatus('ok', `已保存 ${clock(lastSyncAt)}`, `项目 ${updated.name} · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    setSyncStatus('ok', `已保存 ${clock(lastSyncAt)}`, `项目 ${updated.name} · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
     return true;
   }
   async function removeProjectRemote(id) {
     if (!currentUserId) {
       save();
-      setSyncStatus('ok', '本机保存', `未连接云端 · ${APP_VERSION}`);
+      setSyncStatus('ok', '本机保存', `未连接云端 · ${ATLAS_VERSION}`);
       return new Date().toISOString();
     }
     // 软删除:打 deleted_at 时间戳,数据留在表里。RLS 已禁止真删除。
@@ -503,7 +503,7 @@
       .eq('user_id', currentUserId), '删除项目');
     if (error) { cloudError('删除项目失败', error); return null; }
     lastSyncAt = Date.now();
-    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `项目进废纸篓 · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `项目进废纸篓 · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
     return deletedAt;
   }
   async function restoreProjectRemote(id) {
@@ -517,7 +517,7 @@
       .single(), '恢复项目');
     if (error) { cloudError('恢复项目失败', error); return false; }
     lastSyncAt = Date.now();
-    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `项目已恢复 · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `项目已恢复 · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
     return true;
   }
   async function hardDeleteProjectRemote(id) {
@@ -530,13 +530,13 @@
       .not('deleted_at', 'is', null), '永久删除项目');
     if (error) { cloudError('永久删除项目失败', error); return false; }
     lastSyncAt = Date.now();
-    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `项目已永久删除 · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `项目已永久删除 · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
     return true;
   }
   async function persistIdea(i) {
     if (!currentUserId) {
       save();
-      setSyncStatus('ok', '本机保存', `未连接云端 · ${APP_VERSION}`);
+      setSyncStatus('ok', '本机保存', `未连接云端 · ${ATLAS_VERSION}`);
       return true;
     }
     const row = ideaToRow(i, currentUserId);
@@ -551,13 +551,13 @@
     else state.ideas.push(updated);
     save();
     lastSyncAt = Date.now();
-    setSyncStatus('ok', `已保存 ${clock(lastSyncAt)}`, `灵感已保存 · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    setSyncStatus('ok', `已保存 ${clock(lastSyncAt)}`, `灵感已保存 · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
     return true;
   }
   async function removeIdeaRemote(id) {
     if (!currentUserId) {
       save();
-      setSyncStatus('ok', '本机保存', `未连接云端 · ${APP_VERSION}`);
+      setSyncStatus('ok', '本机保存', `未连接云端 · ${ATLAS_VERSION}`);
       return new Date().toISOString();
     }
     const deletedAt = new Date().toISOString();
@@ -568,7 +568,7 @@
       .eq('user_id', currentUserId), '删除灵感');
     if (error) { cloudError('删除灵感失败', error); return null; }
     lastSyncAt = Date.now();
-    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `灵感进废纸篓 · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `灵感进废纸篓 · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
     return deletedAt;
   }
   async function restoreIdeaRemote(id) {
@@ -582,7 +582,7 @@
       .single(), '恢复灵感');
     if (error) { cloudError('恢复灵感失败', error); return false; }
     lastSyncAt = Date.now();
-    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `灵感已恢复 · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `灵感已恢复 · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
     return true;
   }
   async function hardDeleteIdeaRemote(id) {
@@ -595,7 +595,7 @@
       .not('deleted_at', 'is', null), '永久删除灵感');
     if (error) { cloudError('永久删除灵感失败', error); return false; }
     lastSyncAt = Date.now();
-    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `灵感已永久删除 · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `灵感已永久删除 · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
     return true;
   }
 
@@ -608,7 +608,7 @@
     if (pRes.error) { cloudError('清空项目废纸篓失败', pRes.error); return false; }
     if (iRes.error) { cloudError('清空灵感废纸篓失败', iRes.error); return false; }
     lastSyncAt = Date.now();
-    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `废纸篓已清空 · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `废纸篓已清空 · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
     return true;
   }
 
@@ -1967,7 +1967,7 @@
         handleIdeaChange)
       .subscribe((status, err) => {
         if (status === 'SUBSCRIBED') {
-          setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `Realtime 已连接 · 用户 ${shortUserId()} · ${APP_VERSION}`);
+          setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `Realtime 已连接 · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           const msg = err && err.message ? err.message : status;
           setSyncStatus('error', '实时同步失败', `${msg} · 会继续每 ${CLOUD_POLL_MS / 1000} 秒拉取云端`);
@@ -1992,7 +1992,7 @@
     }
     save();
     lastSyncAt = Date.now();
-    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `收到项目 ${t} · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `收到项目 ${t} · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
     renderVisibleState();
     showApp();  // 刷菜单 badge
   }
@@ -2007,7 +2007,7 @@
     }
     save();
     lastSyncAt = Date.now();
-    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `收到灵感 ${t} · 用户 ${shortUserId()} · ${APP_VERSION}`);
+    setSyncStatus('ok', `已同步 ${clock(lastSyncAt)}`, `收到灵感 ${t} · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
     renderVisibleState();
     showApp();
   }
@@ -2058,7 +2058,7 @@
       }
     }
     if (allOk) {
-      setSyncStatus('ok', '已备份云端', `本机数据仍保留 · ${APP_VERSION}`);
+      setSyncStatus('ok', '已备份云端', `本机数据仍保留 · ${ATLAS_VERSION}`);
     }
   }
 
@@ -2071,7 +2071,7 @@
     }
     currentUserId = userId;
     try {
-      setSyncStatus('syncing', '连接云端', `用户 ${shortUserId()} · ${APP_VERSION}`);
+      setSyncStatus('syncing', '连接云端', `用户 ${shortUserId()} · ${ATLAS_VERSION}`);
       await maybeMigrateLocalToCloud(userId);
       encSettings = await loadUserSettings(userId);
       await cloudRefreshAll('登录后加载');
@@ -2101,7 +2101,7 @@
   async function bootstrap() {
     if (!cloud) {
       // 没接云端 (config 空) — 单机模式,保持原行为
-      setSyncStatus('ok', '本机模式', `未配置 Supabase · ${APP_VERSION}`);
+      setSyncStatus('ok', '本机模式', `未配置 Supabase · ${ATLAS_VERSION}`);
       showApp();
       return;
     }
