@@ -8,9 +8,10 @@
   const LOCAL_BACKUP_KEY = 'saas-command:pre-cloud-backup:v1';
   const THEME_KEY = 'saas-command:theme';
   const LAST_EMAIL_KEY = 'atlas:last-email';  // 登录时帮用户记住邮箱
-  const APP_VERSION = 'atlas-v33';
+  const APP_VERSION = 'atlas-v34';
   const CLOUD_POLL_MS = 15000;
   const CLOUD_TIMEOUT_MS = 12000;
+  const PIN_MENU_ENABLED = false;
   const VALID_THEMES = ['white', 'black', 'gray', 'blue', 'green', 'pink'];
 
   /** @type {{projects: Project[], ideas: Idea[]}} */
@@ -1654,16 +1655,14 @@
     appMainEl.hidden = false;
     menuSignout.hidden = !cloudEnabled;
     menuDividerAccount.hidden = !cloudEnabled;
-    // PIN 菜单可见性: 仅云端模式显示。
-    // - 没设过 PIN → 显示「设置加密 PIN」
-    // - 设过但本 session 未解锁 → 显示「解锁 API Keys」
-    // - 设过且已解锁 → 两项都不显示 (后续可加「修改 PIN」)
+    // PIN 是 API Keys 的高级保护。默认不放在主菜单里，保持界面简洁。
+    // 如果历史项目里已有加密 API Keys，项目卡片仍会显示「解锁」按钮。
     const pinSetup = document.getElementById('menu-pin-setup');
     const pinUnlock = document.getElementById('menu-pin-unlock');
     const pinDivider = document.getElementById('menu-divider-pin');
     const hasPinSet = !!(encSettings && encSettings.enc_salt);
-    const showSetup = cloudEnabled && !hasPinSet;
-    const showUnlock = cloudEnabled && hasPinSet && !derivedKey;
+    const showSetup = PIN_MENU_ENABLED && cloudEnabled && !hasPinSet;
+    const showUnlock = PIN_MENU_ENABLED && cloudEnabled && hasPinSet && !derivedKey;
     pinSetup.hidden = !showSetup;
     pinUnlock.hidden = !showUnlock;
     pinDivider.hidden = !cloudEnabled || (!showSetup && !showUnlock);
