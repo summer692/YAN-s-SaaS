@@ -8,7 +8,7 @@
   const LOCAL_BACKUP_KEY = 'saas-command:pre-cloud-backup:v1';
   const THEME_KEY = 'saas-command:theme';
   const LAST_EMAIL_KEY = 'atlas:last-email';  // 登录时帮用户记住邮箱
-  const ATLAS_VERSION = 'atlas-v36';
+  const ATLAS_VERSION = 'atlas-v37';
   const CLOUD_POLL_MS = 15000;
   const CLOUD_TIMEOUT_MS = 12000;
   const PIN_MENU_ENABLED = false;
@@ -884,17 +884,19 @@
 
   async function sendToClaude(text, btnEl) {
     const original = btnEl ? btnEl.textContent : null;
-    // window.open must be called synchronously within the user gesture;
-    // iOS Safari popup blocker rejects it after any await.
-    const tab = window.open('https://claude.ai/new', '_blank', 'noopener');
+    const encoded = encodeURIComponent(text);
+    // window.open must be synchronous (before any await) for iOS Safari popup blocker.
+    // claude:// opens Claude Desktop on Mac or Claude iOS app on iPhone with the
+    // prompt pre-filled via ?q=. This scheme still works in the native apps even
+    // though Anthropic removed ?q= from the web UI in Oct 2025.
+    window.open('claude://claude.ai/new?q=' + encoded, '_blank', 'noopener');
     try {
       await navigator.clipboard.writeText(text);
       if (btnEl) {
-        btnEl.textContent = '✓ 已复制，去 Claude 粘贴';
+        btnEl.textContent = '✓ 正在打开 Claude';
         setTimeout(() => { btnEl.textContent = original; }, 2000);
       }
     } catch (_) {
-      if (tab) tab.close();
       window.prompt('复制下面这段，在 Claude 里粘贴：', text);
     }
   }
