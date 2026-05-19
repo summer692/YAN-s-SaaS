@@ -8,7 +8,7 @@
   const LOCAL_BACKUP_KEY = 'saas-command:pre-cloud-backup:v1';
   const THEME_KEY = 'saas-command:theme';
   const LAST_EMAIL_KEY = 'atlas:last-email';  // 登录时帮用户记住邮箱
-  const ATLAS_VERSION = 'atlas-v35';
+  const ATLAS_VERSION = 'atlas-v36';
   const CLOUD_POLL_MS = 15000;
   const CLOUD_TIMEOUT_MS = 12000;
   const PIN_MENU_ENABLED = false;
@@ -868,7 +868,7 @@
     const askBtn = document.createElement('button');
     askBtn.className = 'accent';
     askBtn.textContent = '让 Claude 给建议';
-    askBtn.addEventListener('click', () => askClaudeAboutProject(p));
+    askBtn.addEventListener('click', () => askClaudeAboutProject(p, askBtn));
     const editBtn = document.createElement('button');
     editBtn.textContent = '编辑';
     editBtn.addEventListener('click', () => openProjectModal(p));
@@ -882,7 +882,24 @@
     return card;
   }
 
-  function askClaudeAboutProject(p) {
+  async function sendToClaude(text, btnEl) {
+    const original = btnEl ? btnEl.textContent : null;
+    // window.open must be called synchronously within the user gesture;
+    // iOS Safari popup blocker rejects it after any await.
+    const tab = window.open('https://claude.ai/new', '_blank', 'noopener');
+    try {
+      await navigator.clipboard.writeText(text);
+      if (btnEl) {
+        btnEl.textContent = '✓ 已复制，去 Claude 粘贴';
+        setTimeout(() => { btnEl.textContent = original; }, 2000);
+      }
+    } catch (_) {
+      if (tab) tab.close();
+      window.prompt('复制下面这段，在 Claude 里粘贴：', text);
+    }
+  }
+
+  function askClaudeAboutProject(p, btnEl) {
     const lines = [];
     lines.push(`# 项目: ${p.name}`);
     lines.push(`状态: ${p.status || '构思中'} · 完成度 ${p.progress || 0}%`);
@@ -898,14 +915,19 @@
     }
     lines.push('');
     lines.push('请基于以上信息给我几条具体可执行的建议：下一步该做什么？有没有可能被忽视的风险？');
-    const text = lines.join('\n');
+    sendToClaude(lines.join('\n'), btnEl);
+  }
 
-    if (typeof window.claude !== 'undefined' && typeof window.claude.sendPrompt === 'function') {
-      window.claude.sendPrompt(text);
-    } else {
-      const url = `https://claude.ai/new?q=${encodeURIComponent(text)}`;
-      window.open(url, '_blank', 'noopener');
-    }
+  function askClaudeAboutIdea(idea, btnEl) {
+    const lines = [];
+    lines.push('# 灵感');
+    lines.push(`内容: ${idea.content}`);
+    lines.push(`标签: ${idea.tag || '其他'}`);
+    lines.push(`优先级: ${idea.priority || '中'}`);
+    lines.push(`记于: ${formatDate(idea.createdAt)}`);
+    lines.push('');
+    lines.push('我想继续展开聊聊这条灵感 —— 帮我从几个角度发散，挑出值得深挖的点和可能被我忽视的盲区。');
+    sendToClaude(lines.join('\n'), btnEl);
   }
 
   function renderKeyLine(line, revealed) {
@@ -1117,11 +1139,14 @@
 
     const actions = document.createElement('div');
     actions.className = 'idea-actions';
+    const askBtn = document.createElement('button');
+    askBtn.textContent = '让 Claude 聊聊';
+    askBtn.addEventListener('click', () => askClaudeAboutIdea(idea, askBtn));
     const del = document.createElement('button');
     del.className = 'danger';
     del.textContent = '删除';
     del.addEventListener('click', () => deleteIdea(idea.id));
-    actions.append(del);
+    actions.append(askBtn, del);
 
     meta.append(tagPill, prioPill, time, spacer, actions);
 
