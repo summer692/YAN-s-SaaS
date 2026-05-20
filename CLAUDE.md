@@ -18,8 +18,12 @@
 
 ## 技术栈
 
-- **纯前端**：HTML + CSS + JavaScript（IIFE 包装、无框架、**无构建步骤**、**无依赖**）
-- **数据**：浏览器 `localStorage`，key = `saas-command:v1`
+- **前端**：HTML + CSS + JavaScript（IIFE 包装、无框架、无 npm 依赖。`@supabase/supabase-js@2` 走 CDN，不打包）
+- **后端**：**Supabase**（Postgres + Auth + RLS）。3 张表：`projects`、`ideas`、`user_settings`，都在 `public` schema
+- **登录**：Supabase 邮箱 OTP（8 位数字验证码，`shouldCreateUser: false`）。新用户必须先在 Supabase 后台手动添加
+- **本地存储**：`localStorage` key = `saas-command:v1`。**用途有三种**：(1) 未登录或没配 Supabase 时的「本机模式」纯本地存储；(2) 已登录时的本地缓存，进 App 先渲染本地数据再异步拉云端；(3) 离线时改动的待同步队列（`pendingSync` 标记，回到在线后批量 upsert）
+- **客户端加密**：API Keys 字段（`projects.api_keys_cipher`）用 PIN（6 位数字）通过 PBKDF2 派生 AES-GCM-256 密钥客户端加密；云端只存密文。PIN 丢了 = API Keys 永远读不回来
+- **构建**：仅一步 —— `node scripts/build-config.js` 把 Vercel 环境变量 `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` 写进 `config.js`（仓库里那个 `config.js` 是空模板）
 - **托管**：Vercel（连接 `summer692/YAN-s-SaaS` 仓库的 `main` 分支自动部署）
 - **PWA**：manifest + service worker，可装到 iPhone 主屏幕
 
@@ -27,34 +31,39 @@
 
 ```
 .
-├── index.html            主入口 + 内联启动画面 CSS
-├── app.js                所有应用逻辑（IIFE 闭包）
-├── styles.css            全局样式（Apple HIG 风格）
-├── themes.css            6 套主题色 tokens
-├── manifest.json         PWA 配置
-├── service-worker.js     离线缓存 + 更新检测
+├── index.html                          主入口 + 内联启动画面 CSS + 登录页 + 主 App 页
+├── app.js                              所有应用逻辑（IIFE 闭包，~85KB）
+├── styles.css                          全局样式（Apple HIG 风格）
+├── themes.css                          6 套主题色 tokens
+├── config.js                           构建时生成，含 supabaseUrl/supabaseKey（仓库里是空模板）
+├── manifest.json                       PWA 配置
+├── service-worker.js                   PWA 更新检测（v32 起不再缓存任何资源，只做版本变更通知）
+├── vercel.json                         Vercel 构建命令 + 缓存 header
+├── scripts/
+│   └── build-config.js                 把 Vercel 环境变量写进 config.js
+├── supabase-trash-delete-policy.sql    RLS：只允许删 deleted_at 非空的行（强制走废纸篓）
 ├── icons/
-│   ├── icon.svg                 主图标（C4 设计：蓝渐变 + 白圆 + 偏心白点）
-│   ├── icon-maskable.svg        安卓自适应版本
-│   ├── apple-touch-icon-*.png   iOS 标准尺寸 PNG（120/152/167/180）
-│   ├── apple-touch-icon.png     兜底 180x180
-│   └── icon-{a,b,c,c1-c4}.svg   历史候选方案（用户挑了 c4，其余留作参考）
-├── icon-preview.html     图标方案对比预览页（用户挑图标时用过，保留可重用）
-├── README.md             部署 / 使用说明
-├── CLAUDE.md             本文件
-└── requirements.md       原始需求文档
+│   ├── icon.svg                        主图标（C4 设计：蓝渐变 + 白圆 + 偏心白点）
+│   ├── icon-maskable.svg               安卓自适应版本
+│   ├── apple-touch-icon-*.png          iOS 标准尺寸 PNG（120/152/167/180）
+│   ├── apple-touch-icon.png            兜底 180x180
+│   └── icon-{a,b,c,c1-c4}.svg          历史候选方案（用户挑了 c4，其余留作参考）
+├── icon-preview.html                   图标方案对比预览页（用户挑图标时用过，保留可重用）
+├── README.md                           部署 / 使用说明
+├── CLAUDE.md                           本文件
+└── requirements.md                     原始需求文档
 ```
 
 ## 工作流（重要 — 严格遵守）
 
 ### 分支与 PR
-- **开发分支固定为 `claude/mvp-project-manager-4ulyI`**（这是初始环境给的，不要换）
+- **当前长期开发分支：`atlas-cache-bust-fix`**（仓库历史上换过几次，老的 `claude/mvp-project-manager-4ulyI` 已经退役。看 `git branch --show-current` 确认）
 - 任何改动：
-  1. 在 `claude/mvp-project-manager-4ulyI` 上 commit + push
-  2. 用 `mcp__github__create_pull_request` 创建 PR 到 `main`
-  3. 用 `mcp__github__merge_pull_request` 合并（不需要用户操作）
+  1. 在当前开发分支上 commit + push
+  2. 创建 PR 到 `main`（如果有 `mcp__github__create_pull_request` 工具就用它；否则用 `gh pr create`；都没有就把分支推上去给用户一个链接让她在网页点合并）
+  3. 合并 PR（同上，能自动就自动）
   4. Vercel 自动 detect main 分支变化并重新部署
-- 这个用户**不会**自己点 Merge 按钮 —— Claude 必须主动用 MCP 工具合并
+- 这个用户**不会**自己点 Merge 按钮 —— Claude 要尽量自己负责到合并那一步
 
 ### 仓库范围
 GitHub MCP 工具只允许操作 `summer692/yan-s-saas`。其他仓库的调用会被拒。
@@ -94,43 +103,58 @@ const ATLAS_VERSION = 'atlas-v35';  // 必须和上面完全一致
 
 ## 数据模型
 
-存储 key: `saas-command:v1`
+数据**同时**存在两个地方，schema 不一样：
+- **Supabase**（云端，登录后的真相源）：snake_case 列名，有 `user_id` / `created_at` / `updated_at` / `deleted_at`
+- **localStorage** / 内存 state（本地缓存）：camelCase 字段名，由 `rowToProject` / `rowToIdea`（`app.js:304, 337`）从 Supabase 行转出来；写云端时由 `projectToRow` / `ideaToRow`（`app.js:282, 327`）转回去
 
-```js
-{
-  projects: [{
-    id: string,
-    name: string,
-    status: '构思中'|'开发中'|'已上线'|'暂停'|'已下线',
-    progress: number (0-100),
-    domain: string,
-    registrar: string,
-    domainExpiry: 'YYYY-MM-DD',
-    domainFee: number,                       // 首年费金额
-    domainFeeCurrency: 'CNY'|'USD',
-    domainRenewalFee: number | null,         // 续费金额（可选）
-    domainRenewalFeeCurrency: 'CNY'|'USD',
-    stack: string,
-    apiKeys: string,        // 多行，"服务名=密钥" 格式
-    monthlyCost: number,    // 一律 CNY
-    monthlyRevenue: number, // 一律 CNY
-    notes: string,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  }],
-  ideas: [{
-    id: string,
-    content: string,
-    tag: '新项目想法'|'功能改进'|'增长营销'|'技术想法'|'其他',
-    priority: '低'|'中'|'高',
-    createdAt: timestamp,
-  }]
-}
-```
+Supabase key 列在 `app.js` 的转换函数里写得最清楚，下面是抄一遍（添字段时改这俩函数 + Supabase 后台加列）：
 
-加新字段时：
-- 旧数据没有新字段 → load 时默认值兜底（不要数据迁移）
-- 货币、状态等枚举：在 load 时校验并 fallback
+### `public.projects`
+| 列名 | 类型 | 说明 |
+|---|---|---|
+| `id` | uuid | PK，客户端用 `crypto.randomUUID()` 生成 |
+| `user_id` | uuid | FK → `auth.users.id`，RLS 用这个隔离 |
+| `name` | text | |
+| `status` | text | `构思中` / `开发中` / `已上线` / `暂停` / `已下线` |
+| `progress` | int | 0-100 |
+| `domain`, `registrar` | text | |
+| `domain_expiry` | date | `YYYY-MM-DD` |
+| `domain_fee`, `domain_fee_currency` | numeric, text | 首年费 + `CNY` / `USD` |
+| `domain_renewal_fee`, `domain_renewal_fee_currency` | numeric, text | 续费（可空）+ 币种 |
+| `stack` | text | |
+| `api_keys_cipher` | text | **客户端加密后的密文**（`atlas:v1:` 前缀），未设 PIN 时是明文 |
+| `monthly_cost`, `monthly_revenue` | numeric | 一律 CNY |
+| `notes` | text | |
+| `created_at`, `updated_at`, `deleted_at` | timestamptz | `deleted_at` 非空 = 在废纸篓 |
+
+### `public.ideas`
+| 列名 | 类型 | 说明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `user_id` | uuid | FK |
+| `content` | text | |
+| `tag` | text | `新项目想法` / `功能改进` / `增长营销` / `技术想法` / `其他` |
+| `priority` | text | `低` / `中` / `高` |
+| `created_at`, `deleted_at` | timestamptz | |
+
+### `public.user_settings`
+| 列名 | 类型 | 说明 |
+|---|---|---|
+| `user_id` | uuid | PK，FK → `auth.users.id` |
+| `enc_salt` | text | base64，PBKDF2 salt |
+| `enc_check_cipher` | text | 加密的校验串（解开 = `ATLAS-PIN-OK` 才算 PIN 对） |
+
+### RLS
+- 三张表的 SELECT/INSERT/UPDATE：`auth.uid() = user_id`
+- DELETE：在 `supabase-trash-delete-policy.sql` 里，**只允许删 `deleted_at is not null` 的行**（强制走废纸篓再清空）
+
+### 加新字段时
+1. 在 Supabase 后台给表加列（带默认值，旧行才不会变 null）
+2. `projectToRow` / `ideaToRow` 写回云端时映射进 snake_case
+3. `rowToProject` / `rowToIdea` 读回来时映射成 camelCase，带兜底值
+4. 表单（`index.html`）+ 渲染（`renderProjectCard` / `renderIdeaCard`）跟着改
+5. 旧本地数据没有新字段 → load 时默认值兜底（不要写迁移）
+6. ATLAS_VERSION +1
 
 ## 常见任务速查
 

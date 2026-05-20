@@ -8,7 +8,7 @@
   const LOCAL_BACKUP_KEY = 'saas-command:pre-cloud-backup:v1';
   const THEME_KEY = 'saas-command:theme';
   const LAST_EMAIL_KEY = 'atlas:last-email';  // 登录时帮用户记住邮箱
-  const ATLAS_VERSION = 'atlas-v37';
+  const ATLAS_VERSION = 'atlas-v38';
   const CLOUD_POLL_MS = 15000;
   const CLOUD_TIMEOUT_MS = 12000;
   const PIN_MENU_ENABLED = false;
@@ -1638,8 +1638,6 @@
   });
 
   // ---------- 云端 (Supabase) + 登录态守卫 ----------
-  // 阶段 1: 只接通登录,数据仍读 localStorage。
-  // 下个 PR 才把读写都换成 Supabase + 迁移本地数据 + Realtime。
   const cloudConfig = window.ATLAS_CONFIG || {};
   const cloudEnabled = !!(cloudConfig.supabaseUrl && cloudConfig.supabaseKey && window.supabase);
   const cloud = cloudEnabled
