@@ -6,7 +6,7 @@
  * 原因：浏览器靠 service-worker.js 的字节变化检测「有新 SW 待安装」，
  * 字节不变 → 老用户的旧 SW 不会被替换 → 这段 unregister 逻辑跑不到他们身上。 */
 
-const ATLAS_VERSION = 'atlas-v37';
+const ATLAS_VERSION = 'atlas-v38';
 
 async function clearAtlasCaches() {
   if (!self.caches) return;
