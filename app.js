@@ -8,7 +8,7 @@
   const LOCAL_BACKUP_KEY = 'saas-command:pre-cloud-backup:v1';
   const THEME_KEY = 'saas-command:theme';
   const LAST_EMAIL_KEY = 'atlas:last-email';  // 登录时帮用户记住邮箱
-  const ATLAS_VERSION = 'atlas-v38';
+  const ATLAS_VERSION = 'atlas-v39';
   const CLOUD_POLL_MS = 15000;
   const CLOUD_TIMEOUT_MS = 12000;
   const PIN_MENU_ENABLED = false;
@@ -294,7 +294,7 @@
       domain_renewal_fee: p.domainRenewalFee ?? null,
       domain_renewal_fee_currency: p.domainRenewalFeeCurrency || 'CNY',
       stack: p.stack || '',
-      api_keys_cipher: p.apiKeys || '',  // Phase 3 加 PIN 加密;现在是明文,RLS 保证只有自己能读
+      api_keys_cipher: p.apiKeys || '',  // PIN 加密已上线: 存密文 (atlas:v1: 前缀); 未设 PIN 时存明文
       monthly_cost: Number(p.monthlyCost) || 0,
       monthly_revenue: Number(p.monthlyRevenue) || 0,
       notes: p.notes || '',
