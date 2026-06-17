@@ -8,7 +8,7 @@
   const LOCAL_BACKUP_KEY = 'saas-command:pre-cloud-backup:v1';
   const THEME_KEY = 'saas-command:theme';
   const LAST_EMAIL_KEY = 'atlas:last-email';  // 登录时帮用户记住邮箱
-  const ATLAS_VERSION = 'atlas-v39';
+  const ATLAS_VERSION = 'atlas-v40';
   const CLOUD_POLL_MS = 15000;
   const CLOUD_TIMEOUT_MS = 12000;
   const PIN_MENU_ENABLED = false;
@@ -111,6 +111,7 @@
     return [
       `版本: ${ATLAS_VERSION}`,
       `云端配置: ${cloudEnabled ? '已配置' : '未配置,本机模式'}`,
+      cloudEnabled ? `云端通道: ${cloudUsesProxy ? '同域代理 + 轮询' : 'Supabase 直连 + Realtime'}` : '',
       `用户: ${shortUserId()}`,
       `同步: ${lastSyncText}`,
       `最后成功: ${clock(lastSyncAt)}`,
@@ -360,7 +361,7 @@
 
   function cloudSoftError(label, error) {
     console.error(label, error);
-    setSyncStatus('error', label, `${error.message || error} · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
+    setSyncStatus('error', label, `${explainCloudError(error)} · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
   }
 
   async function flushPendingSync(reason) {
@@ -454,8 +455,9 @@
 
   function cloudError(label, error) {
     console.error(label, error);
-    setSyncStatus('error', label, `${error.message || error} · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
-    alert(`${label}:${error.message || error}`);
+    const msg = explainCloudError(error);
+    setSyncStatus('error', label, `${msg} · 用户 ${shortUserId()} · ${ATLAS_VERSION}`);
+    alert(`${label}:${msg}`);
   }
 
   async function persistProject(p) {
@@ -1639,10 +1641,40 @@
 
   // ---------- 云端 (Supabase) + 登录态守卫 ----------
   const cloudConfig = window.ATLAS_CONFIG || {};
-  const cloudEnabled = !!(cloudConfig.supabaseUrl && cloudConfig.supabaseKey && window.supabase);
+  function resolveCloudUrl(value) {
+    if (!value) return '';
+    try {
+      return new URL(value, window.location.origin).toString().replace(/\/+$/, '');
+    } catch (err) {
+      console.warn('invalid supabaseUrl', err);
+      return '';
+    }
+  }
+  function isSameOriginSupabaseProxy(value) {
+    try {
+      const url = new URL(value);
+      return url.origin === window.location.origin && url.pathname.replace(/\/+$/, '') === '/api/supabase';
+    } catch {
+      return false;
+    }
+  }
+  const cloudUrl = resolveCloudUrl(cloudConfig.supabaseUrl);
+  const cloudUsesProxy = isSameOriginSupabaseProxy(cloudUrl);
+  const cloudEnabled = !!(cloudUrl && cloudConfig.supabaseKey && window.supabase);
   const cloud = cloudEnabled
-    ? window.supabase.createClient(cloudConfig.supabaseUrl, cloudConfig.supabaseKey)
+    ? window.supabase.createClient(cloudUrl, cloudConfig.supabaseKey)
     : null;
+  const cloudRealtimeEnabled = cloudEnabled && !cloudUsesProxy;
+
+  function explainCloudError(error) {
+    const msg = error && error.message ? error.message : String(error || '');
+    if (/failed to fetch|fetch failed|networkerror|load failed/i.test(msg)) {
+      return cloudUsesProxy
+        ? 'Atlas 云端代理暂时连不上 Supabase,可能是 Supabase 项目暂停或服务异常。稍后重试,或联系我检查 Supabase 后台。'
+        : '这台设备当前连不上 Supabase 云端。可以先换网络或打开代理/VPN 再试,本机数据不会丢。';
+    }
+    return msg;
+  }
 
   const authView = document.getElementById('auth-view');
   const appHeader = document.querySelector('.app-header');
@@ -1920,7 +1952,7 @@
         showCodeStep(email);
         setStatus('邮件里有数字登录码,5 分钟内有效。', 'success');
       } catch (err) {
-        setStatus(`发送失败:${err.message || err}`, 'error');
+        setStatus(`发送失败:${explainCloudError(err)}`, 'error');
         authSubmitEmail.disabled = false;
       }
     });
@@ -1945,7 +1977,7 @@
         // 成功的话 onAuthStateChange 会立刻触发 SIGNED_IN,
         // 那边的 showApp() 会负责切到主界面,这里不用额外做
       } catch (err) {
-        setStatus(`验证失败:${err.message || err}。看下数字有没有打错,或者再发一次新码。`, 'error');
+        setStatus(`验证失败:${explainCloudError(err)}。看下数字有没有打错,或者再发一次新码。`, 'error');
         authSubmitCode.disabled = false;
       }
     });
@@ -1980,7 +2012,7 @@
   // 实时订阅 (Realtime) -------------------------------------------------
   let realtimeChannel = null;
   function setupRealtime(userId) {
-    if (!cloud) return;
+    if (!cloud || !cloudRealtimeEnabled) return;
     if (realtimeChannel) cloud.removeChannel(realtimeChannel);
     realtimeChannel = cloud
       .channel(`atlas-${userId}`)
@@ -2100,7 +2132,7 @@
       await maybeMigrateLocalToCloud(userId);
       encSettings = await loadUserSettings(userId);
       await cloudRefreshAll('登录后加载');
-      setupRealtime(userId);
+      if (cloudRealtimeEnabled) setupRealtime(userId);
       startCloudPolling();
     } catch (err) {
       cloudError('云端连接失败,显示空状态。请刷新重试', err);
