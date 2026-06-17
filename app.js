@@ -8,7 +8,7 @@
   const LOCAL_BACKUP_KEY = 'saas-command:pre-cloud-backup:v1';
   const THEME_KEY = 'saas-command:theme';
   const LAST_EMAIL_KEY = 'atlas:last-email';  // 登录时帮用户记住邮箱
-  const ATLAS_VERSION = 'atlas-v40';
+  const ATLAS_VERSION = 'atlas-v41';
   const CLOUD_POLL_MS = 15000;
   const CLOUD_TIMEOUT_MS = 12000;
   const PIN_MENU_ENABLED = false;

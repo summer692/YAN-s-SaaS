@@ -7,6 +7,12 @@
       "destination": "/api/supabase?atlas_proxy_path=:path"
     }
   ],
+  "crons": [
+    {
+      "path": "/api/health/supabase",
+      "schedule": "0 0 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/",
